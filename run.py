@@ -21,8 +21,8 @@ settings = {
             "class": "agents.boulware_agent.boulware_agent.BoulwareAgent",
         },
         {
-            "class": "agents.template_agent.template_agent.TemplateAgent",
-            "parameters": {"storage_dir": "agent_storage/TemplateAgent"},
+            "class": "agents.SUN_AGENT.SUN_Agent.SunAgent",
+            "parameters": {"storage_dir": "agent_storage/SunAgent"},
         },
     ],
     "profiles": ["domains/domain00/profileA.json", "domains/domain00/profileB.json"],

@@ -18,8 +18,8 @@ if not RESULTS_DIR.exists():
 tournament_settings = {
     "agents": [
         {
-            "class": "agents.template_agent.template_agent.TemplateAgent",
-            "parameters": {"storage_dir": "agent_storage/TemplateAgent"},
+            "class": "agents.SUN_AGENT.SUN_Agent.SunAgent",
+            "parameters": {"storage_dir": "agent_storage/SunAgent"},
         },
         {
             "class": "agents.boulware_agent.boulware_agent.BoulwareAgent",

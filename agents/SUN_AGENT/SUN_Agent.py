@@ -27,10 +27,10 @@ from geniusweb.progress.ProgressTime import ProgressTime
 from geniusweb.references.Parameters import Parameters
 from tudelft_utilities_logging.ReportToLogger import ReportToLogger
 
-from agents.template_agent.utils.opponent_model import OpponentModel
+from agents.SUN_AGENT.utils.opponent_model import OpponentModel
 
 
-class TemplateAgent(DefaultParty):
+class SunAgent(DefaultParty):
     """
     Template of a Python geniusweb agent.
     """
