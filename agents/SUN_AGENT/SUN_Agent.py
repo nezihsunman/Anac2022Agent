@@ -29,6 +29,9 @@ from tudelft_utilities_logging.ReportToLogger import ReportToLogger
 
 from agents.SUN_AGENT.utils.opponent_model import OpponentModel
 
+from agents.SUN_AGENT.utils.GradientBoostingRegresor import GradientBoostingRegressorModel
+from agents.SUN_AGENT.utils.profile_parser import ProfileParser
+
 
 class SunAgent(DefaultParty):
     """
@@ -50,6 +53,11 @@ class SunAgent(DefaultParty):
 
         self.last_received_bid: Bid = None
         self.opponent_model: OpponentModel = None
+
+        self.profile_parser = ProfileParser()
+
+        self.gradientBoostingRegressor = GradientBoostingRegressorModel(self.profile_parser)
+
         self.logger.log(logging.INFO, "party is initialized")
 
     def notifyChange(self, data: Inform):
@@ -79,6 +87,11 @@ class SunAgent(DefaultParty):
             )
             self.profile = profile_connection.getProfile()
             self.domain = self.profile.getDomain()
+
+            """Agent Model"""
+            self.gradientBoostingRegressor.add_domain_and_profile(self.domain, self.profile)
+
+            self.profile_parser.parse(self.parameters.get("profiles_domain_of_opponent"))
             profile_connection.close()
 
         # ActionDone informs you of an action (an offer or an accept)
@@ -155,6 +168,10 @@ class SunAgent(DefaultParty):
 
             # update opponent model with bid
             self.opponent_model.update(bid)
+
+            self.gradientBoostingRegressor.add_opponent_offer_to_x(bid)
+
+            self.profile_parser.getUtility(bid)
             # set bid as last received
             self.last_received_bid = bid
 
@@ -162,6 +179,9 @@ class SunAgent(DefaultParty):
         """This method is called when it is our turn. It should decide upon an action
         to perform and send this action to the opponent.
         """
+        if len(self.opponent_model.offers_unique) > 30:
+            self.gradientBoostingRegressor.evaluate_model_and_compare()
+
         # check if the last received offer is good enough
         if self.accept_condition(self.last_received_bid):
             # if so, accept the offer

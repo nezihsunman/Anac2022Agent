@@ -10,7 +10,7 @@ class OpponentModel:
     def __init__(self, domain: Domain):
         self.offers = []
         self.domain = domain
-
+        self.offers_unique = []
         self.issue_estimators = {
             i: IssueEstimator(v) for i, v in domain.getIssuesValues().items()
         }
@@ -18,6 +18,9 @@ class OpponentModel:
     def update(self, bid: Bid):
         # keep track of all bids received
         self.offers.append(bid)
+
+        if bid not in self.offers_unique:
+            self.offers_unique.append(bid)
 
         # update all issue estimators with the value that is offered for that issue
         for issue_id, issue_estimator in self.issue_estimators.items():
@@ -89,7 +92,7 @@ class IssueEstimator:
         # then the predicted issue weight == 1.0
         equal_shares = self.bids_received / self.num_values
         self.weight = (self.max_value_count - equal_shares) / (
-            self.bids_received - equal_shares
+                self.bids_received - equal_shares
         )
 
         # recalculate all value utilities
