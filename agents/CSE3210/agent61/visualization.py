@@ -6,9 +6,9 @@ dictionary = json.load(open('././results/results_summaries.json', 'r'))
 i = 0
 
 for result in dictionary:
-    print(result.items())
+  #print(result.items())
     agreement = (result["result"] == "agreement")
-    print(agreement)
+  #print(agreement)
     adding = {'nash_product','social_welfare'}
 
     xAxis = []

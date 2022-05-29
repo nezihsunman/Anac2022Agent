@@ -242,7 +242,7 @@ if __name__ == '__main__':
     curses.nocbreak()
     curses.endwin()
 
-    print(f"Total time taken: {int(time.time() - start):-3}s")
+    # print(f"Total time taken: {int(time.time() - start):-3}s")
     # Pick the top 10 scores
     time_str = time.strftime("%Y%m%d-%H%M%S")
     w = open(f"metric_{time_str}.log", "w")

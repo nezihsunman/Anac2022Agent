@@ -17,11 +17,11 @@ def ask_proceed(question, default="no"):
         raise ValueError(f"invalid default answer: {default}")
 
     while True:
-        print(f"{question} {prompt}")
+      #print(f"{question} {prompt}")
         choice = input().lower()
         if default is not None and choice == "":
             return valid[default]
         elif choice in valid:
             return valid[choice]
         else:
-            print("Please respond with 'yes' or 'no' (or 'y' or 'n').")
+          print("Please respond with 'yes' or 'no' (or 'y' or 'n').")

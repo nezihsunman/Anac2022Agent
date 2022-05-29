@@ -62,13 +62,13 @@ class Opponent:
             else:
                 self._changed_issues.add(issue)
 
-        print("=========")
-        print("Last bid: " + str(self._lastBid))
-        print("Curr bid: " + str(received_bid))
-        print("Before: " + str(self._freqDict))
+      #print("=========")
+      #print("Last bid: " + str(self._lastBid))
+      #print("Curr bid: " + str(received_bid))
+      #print("Before: " + str(self._freqDict))
         self._freqDict = self.normalize(self._freqDict, 1)
-        print("After: " + str(self._freqDict))
-        print("=========")
+      #print("After: " + str(self._freqDict))
+      #print("=========")
 
     def normalize(self, d: dict, target=1.0):
         raw = sum(d.values())

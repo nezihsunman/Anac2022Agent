@@ -65,17 +65,17 @@ for e1 in np.arange(e1_min, e1_max, step):
                 "parameters": {"e1": e1, "e2":e2, "e3":e3, "utilWeight" : utilGoal, "leniencyWeight" : (1-utilGoal), "leniencyBase" : leniBase},
           }
           # run a session and obtain results in dictionaries
-          print("Touring\n", flush=True)
+        #print("Touring\n", flush=True)
           tournament, results_summaries = run_tournament(tournament_settings)
 
-          print("Calcing\n", flush=True)
+        #print("Calcing\n", flush=True)
           
           my_agent = "ThreePhaseAgent"
           tour = TournamentInfo(results_summaries, my_agent)
           util, nash, social = tour.getTournamentInfo()
           score = scoringFunction(util, nash, social)
           params = f'{e1},{e2},{e3},{utilGoal},{1-utilGoal},{leniBase}'
-          print("Writing\n", flush=True)
+        #print("Writing\n", flush=True)
           with open("results/gridSearch.csv", "a") as f:
               f.write("{},{}\n".format(params, score))
           

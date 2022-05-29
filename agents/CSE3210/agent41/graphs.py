@@ -8,7 +8,7 @@ def get_pareto_frontier(data):
     y = []
     pareto = data["pareto_front"]
     for case in pareto:
-        print(case)
+      #print(case)
         x.append(case['utility'][0])
         y.append(case['utility'][1])
     return x, y

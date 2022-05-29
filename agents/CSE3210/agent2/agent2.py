@@ -316,7 +316,7 @@ class Agent2(DefaultParty):
 
     def _print_utility(self, bid: Bid) -> None:
         profile, _ = self._get_profile_and_progress()
-        print("Bid:", bid, "with utility:", profile.getUtility(bid))
+        #print("Bid:", bid, "with utility:", profile.getUtility(bid))
 
     def _plot_characteristics(self) -> None:
         characteristics = {

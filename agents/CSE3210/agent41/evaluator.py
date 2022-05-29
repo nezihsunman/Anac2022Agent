@@ -102,8 +102,8 @@ with alive_bar(iters) as bar:
         max_wins = curr_wins
         avg_sw = sw
         winning_conf = conf
-        print("NEW WINNING CONF WITH {} WINS IS WITH AVG SOCIAL WELFARE OF {}:".format(max_wins, sw))
-        print(json.dumps(winning_conf, indent=2))
+      #print("NEW WINNING CONF WITH {} WINS IS WITH AVG SOCIAL WELFARE OF {}:".format(max_wins, sw))
+      #print(json.dumps(winning_conf, indent=2))
         conf_to_json(conf, "best.json")
       bar()
 

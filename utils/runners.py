@@ -117,7 +117,7 @@ def run_tournament(tournament_settings: dict) -> Tuple[list, list]:
             f"WARNING: this would run {num_sessions} negotiation sessions. Proceed?"
         )
         if not ask_proceed(message):
-            print("Exiting script")
+          #print("Exiting script")
             exit()
 
     tournament_results = []

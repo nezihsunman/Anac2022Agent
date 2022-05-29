@@ -72,7 +72,7 @@ def plot_trace(results_trace: dict, plot_file: str):
     )
     fig.update_xaxes(title_text="round", range=[0, index + 1], ticks="outside")
     fig.update_yaxes(title_text="utility", range=[0, 1], ticks="outside")
-    print("{os.path.splitext(plot_file)[0]}.html")
+    #print("{os.path.splitext(plot_file)[0]}.html")
     fig.write_html(f"{os.path.splitext(plot_file)[0]}.html")
 
 def plot_characteristics(characteristics: dict[str, tuple[list[int], list[float], str]], n_rounds: int):

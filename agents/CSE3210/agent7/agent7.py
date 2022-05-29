@@ -189,7 +189,7 @@ class Agent7(DefaultParty):
 
         self._all_offers.append(bid)
         if bid == None:
-            print("Returning bid: " + str(bid))
+          #print("Returning bid: " + str(bid))
 
         return bid
 
@@ -238,7 +238,7 @@ class Agent7(DefaultParty):
 
         self._issue_by_weight = sorted(self._issue_by_weight.items(), key=operator.itemgetter(1))
 
-        print(self._issue_by_weight)
+      #print(self._issue_by_weight)
 
     def _findTradeOff(self):
         if len(self._trade_offers) == 0:
@@ -288,7 +288,7 @@ class Agent7(DefaultParty):
 
         # Check if cast is valid, should always be
         # if isinstance(self._profile.getProfile(), LinearAdditiveUtilitySpace):
-        #    print("Tewst")
+        #  #print("Tewst")
 
         lau: LinearAdditive = cast(LinearAdditive, self._profile.getProfile())
 
@@ -314,7 +314,7 @@ class Agent7(DefaultParty):
             self._value_index = 0
             self._issue_index += 1
 
-        print(current_bid)
+      #print(current_bid)
 
         return Bid(current_bid)"""
 

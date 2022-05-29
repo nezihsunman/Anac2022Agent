@@ -127,7 +127,7 @@ class Domain:
         #     return {"values": values}
 
         domain_size = randint(200, 10000)
-        print(name)
+      #print(name)
         # print(domain_size)
         while True:
             num_issues = randint(4, 10)
