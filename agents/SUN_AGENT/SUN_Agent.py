@@ -5,6 +5,7 @@ from time import time
 from typing import cast, Dict, List, Union, AnyStr, Set
 
 import numpy as np
+import pandas as pd
 from geniusweb.actions.Accept import Accept
 from geniusweb.actions.Action import Action
 from geniusweb.actions.Offer import Offer
@@ -575,17 +576,16 @@ if __name__ == "__main__":
     with open(f"param_result_1.md", "w") as f:
         f.write(json.dumps(param_result))
 """
-if __name__ == "__main__":
+
+
+def deep_analysis_for_machine_learning():
     agent = SunAgent()
     opponent = SunAgent()
-
     domain = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
     domain_path_1 = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
-
     profileJsonOfOpponent = "/profileA.json"
     profileJsonOfAgent = "/profileB.json"
     json_path = ".json"
-
     result = []
     param_result = []
     for i in range(2, 7, 1):
@@ -606,7 +606,7 @@ if __name__ == "__main__":
         for j in range(20, 50, 10):
             bid_number_that_random = j
 
-            for k in range(4, 50):
+            for k in [28, 15, 25]:
                 stringNumber = str(k).zfill(2)
                 print(stringNumber)
                 domain_opponent = domain + stringNumber + profileJsonOfOpponent
@@ -751,8 +751,154 @@ if __name__ == "__main__":
             dictionary2 = {'param': param, 'average_mae_agent': avg_mea_agent_for_param,
                            'average_mae_oppo': avg_mea_oppo_for_param}
             param_result.append(dictionary2)
-
     with open(f"result1.md", "w") as f:
         f.write(json.dumps(result))
     with open(f"param_result_1.md", "w") as f:
         f.write(json.dumps(param_result))
+
+
+def corrolation_analyses():
+    domain = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
+    domain_path_1 = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
+    profileJsonOfOpponent = "/profileA.json"
+    profileJsonOfAgent = "/profileB.json"
+    json_path = ".json"
+
+    domain_analysis_dict = pd.DataFrame()
+
+    value_dict = {}
+    for k in range(4, 50):
+        stringNumber = str(k).zfill(2)
+        print(stringNumber)
+        domain_opponent = domain + stringNumber + profileJsonOfOpponent
+        domain_agent = domain + stringNumber + profileJsonOfAgent
+
+        profile_parser_agent = ProfileParser()
+        profile_parser_agent.parse(domain_agent)
+        profile_parser_opponent = ProfileParser()
+        profile_parser_opponent.parse(domain_opponent)
+
+        domain_path = domain_path_1 + stringNumber + "/domain" + stringNumber + json_path
+
+        with open(domain_path) as file:
+            domain_data = json.load(file)
+        name = "domain_name"
+        issue_values: Dict[str, ValueSet] = {}
+        for issue_dict in domain_data['issuesValues'].keys():
+            mp: List[ImmutableList[Value]] = []
+            for value in domain_data['issuesValues'][issue_dict]['values']:
+                mp.append(cast(Value, value))
+            issue_values[issue_dict] = cast(ImmutableList[Value], mp)
+            # issue_values[issue_dict] = cast(Value,issue_values[issue_dict]['values'])
+
+        domain_class = Domain(name, issue_values)
+        """issues: List[Set[str]] = list(domain_class.getIssues())
+        values: List[ImmutableList[Value]] = [domain_class.getValues(issue) for issue in issues]
+        all_bids: Outer = Outer[Value](values)"""
+        for issue_dict in issue_values:
+            values: List[ImmutableList[Value]] = [domain_class.getValues(issue) for issue in issue_values]
+            issue_values[issue_dict]: List[ImmutableList[Value]] = values
+        all_bids_list = AllBidsList(domain_class)
+
+        sorted_bids_agent = sorted(all_bids_list,
+                                   key=lambda x: profile_parser_agent.getUtility_for_testing(x),
+                                   reverse=True)
+        sorted_bids_opponent = sorted(all_bids_list,
+                                      key=lambda x: profile_parser_opponent.getUtility_for_testing(x),
+                                      reverse=True)
+        """
+        opponent_reg = GradientBoostingRegressorModel(profile_parser_opponent, profile_parser_agent)
+        agent_reg = GradientBoostingRegressorModel(profile_parser_agent, profile_parser_opponent)
+
+        agent_reg.add_domain_and_profile(domain_class, profile_parser_agent, profile_parser_opponent)
+
+        opponent_reg.add_domain_and_profile(domain_class, profile_parser_opponent, profile_parser_agent)
+
+        agent_reg.param = param
+        opponent_reg.param = param
+        """
+        storage_data = None
+        try:
+            with open("result1_5.md") as file:
+                storage_data = json.load(file)
+            print("I load data from storage")
+        except:
+            print("Error skip")
+        domian_spesific_data_list = []
+        average_mae_agent = []
+        average_mae_opponent = []
+        for row in storage_data:
+            if row['profile.agent'] == domain_agent:
+                domian_spesific_data_list.append(row)
+                average_mae_agent.append(float(row['mae_agent']))
+                average_mae_opponent.append(float(row['mae_opponent']))
+
+        average_list_agent = []
+        average_list_opponent = []
+        greater_than_095_agent = []
+        greater_than_090_agent = []
+        greater_than_085_agent = []
+        greater_than_095_opponent = []
+        greater_than_090_opponent = []
+        greater_than_085_opponent = []
+        for x in sorted_bids_agent:
+            util = profile_parser_agent.getUtility_for_testing(x)
+            average_list_agent.append(util)
+            if float(util) > float(0.95):
+                greater_than_095_agent.append(util)
+            elif float(util) > float(0.90):
+                greater_than_090_agent.append(util)
+            elif float(util) > float(0.85):
+                greater_than_085_agent.append(util)
+
+        for x in sorted_bids_opponent:
+            util = profile_parser_opponent.getUtility_for_testing(x)
+            average_list_opponent.append(util)
+            if float(util) > float(0.95):
+                greater_than_095_opponent.append(util)
+            elif float(util) > float(0.90):
+                greater_than_090_opponent.append(util)
+            elif float(util) > float(0.85):
+                greater_than_085_opponent.append(util)
+        percantage_of_greater_than95_agent = float(len(greater_than_095_agent)) / float(len(average_list_agent))
+        percantage_of_greater_than90_agent = float(len(greater_than_090_agent)) / float(len(average_list_agent))
+        percantage_of_greater_than85_agent = float(len(greater_than_085_agent)) / float(len(average_list_agent))
+        percantage_of_greater_than95_opponent = float(len(greater_than_095_opponent)) / float(
+            len(average_list_opponent))
+        percantage_of_greater_than90_opponent = float(len(greater_than_090_opponent)) / float(
+            len(average_list_opponent))
+        percantage_of_greater_than85_opponent = float(len(greater_than_085_opponent)) / float(
+            len(average_list_opponent))
+        average = np.mean(average_list_agent)
+        std = np.std(average_list_agent)
+        list_size_agent = len(average_list_agent)
+        list_size_oppo = len(average_list_opponent)
+        value_dict['average'] = [average]
+        value_dict['std'] = [std]
+        value_dict['percantage_of_greater_than85_agent'] = [percantage_of_greater_than85_agent]
+        value_dict['percantage_of_greater_than90_agent'] = [percantage_of_greater_than90_agent]
+        value_dict['percantage_of_greater_than95_agent'] = [percantage_of_greater_than95_agent]
+        value_dict['percantage_of_greater_than85_opponent'] = [percantage_of_greater_than85_opponent]
+        value_dict['percantage_of_greater_than90_opponent'] = [percantage_of_greater_than90_opponent]
+        value_dict['percantage_of_greater_than95_opponent'] = [percantage_of_greater_than95_opponent]
+        value_dict['list_size_oppo'] = [list_size_oppo]
+        value_dict['list_size_agent'] = [list_size_agent]
+        value_dict['domain_opponent'] = [domain_opponent]
+        value_dict['domain_agent'] = [domain_agent]
+        value_dict['domain_res_agent'] = [domain_agent]
+        value_dict['average_mae_agent'] = [np.mean(average_mae_agent)]
+        value_dict['average_mae_opponent'] = [np.mean(average_mae_opponent)]
+        df = pd.DataFrame.from_dict(value_dict)
+        domain_analysis_dict = pd.concat([domain_analysis_dict, df])
+
+    print("finished")
+    corr = domain_analysis_dict.corr(method='kendall')
+    print("corr")
+
+
+if __name__ == "__main__":
+    bool: bool = True
+    if bool:
+        deep_analysis_for_machine_learning()
+    if not bool:
+        corrolation_analyses()
