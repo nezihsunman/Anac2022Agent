@@ -15,11 +15,11 @@ class ProfileParser:
             self.data = json.load(file)
 
     def getUtility(self, bid: Bid) -> Decimal:
-        return sum([self._util_testing(iss, bid.getValue(iss)) for iss in
+        return sum([self._util(iss, bid.getValue(iss)) for iss in
                     self.data["LinearAdditiveUtilitySpace"]["issueWeights"].keys()])
 
     def getUtility_for_testing(self, bid: Bid) -> Decimal:
-        return sum([self._util_testing(iss, bid.getValue(iss)) for iss in
+        return sum([self._util(iss, bid.getValue(iss)) for iss in
                     self.data["LinearAdditiveUtilitySpace"]["issueWeights"].keys()])  # type:ignore
 
     def _util(self, issue: str, value: Optional[Value]) -> Decimal:

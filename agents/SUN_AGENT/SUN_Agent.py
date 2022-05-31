@@ -34,9 +34,7 @@ from tudelft.utilities.immutablelist.ImmutableList import ImmutableList
 from tudelft.utilities.immutablelist.Outer import Outer
 from tudelft_utilities_logging.ReportToLogger import ReportToLogger
 
-from agents.SUN_AGENT.utils.opponent_model import OpponentModel
-
-from agents.SUN_AGENT.utils.GradientBoostingRegresor import GradientBoostingRegressorModel
+from agents.SUN_AGENT.utils.Sun_Agent_Brain import AgentBrain
 from agents.SUN_AGENT.utils.profile_parser import ProfileParser
 from timeit import default_timer as timer
 
@@ -48,6 +46,7 @@ class SunAgent(DefaultParty):
 
     def __init__(self):
         super().__init__()
+        self.this_session_is_first_match_for_this_opponent = True
         self.logger: ReportToLogger = self.getReporter()
 
         self.domain: Domain = None
@@ -62,13 +61,12 @@ class SunAgent(DefaultParty):
         self.storage_dir: str = None
 
         self.last_received_bid: Bid = None
-        self.opponent_model: OpponentModel = None
 
-        self.profile_parser = ProfileParser()
+        self.profile_opponent_parser = ProfileParser()
         self.profile_parser_opponent = ProfileParser()
 
-        self.gradientBoostingRegressor = GradientBoostingRegressorModel(self.profile_parser,
-                                                                        self.profile_parser_opponent)
+        self.agent_brain = AgentBrain(self.profile_opponent_parser,
+                                      self.profile_parser_opponent)
 
         self.storage_data = {}
         self.isFirstRound = True
@@ -106,9 +104,10 @@ class SunAgent(DefaultParty):
                                           reverse=True)
             """Agent Model"""
 
-            self.profile_parser.parse(self.parameters.get("profiles_domain_of_opponent"))
+            self.profile_opponent_parser.parse(self.parameters.get("profiles_domain_of_opponent"))
 
-            self.gradientBoostingRegressor.add_domain_and_profile(self.domain, self.profile)
+            self.agent_brain.fill_domain_and_profile(self.domain, self.profile,
+                                                     self.profile_opponent_parser)
 
             profile_connection.close()
 
@@ -122,6 +121,7 @@ class SunAgent(DefaultParty):
             if actor != self.me:
                 # obtain the name of the opponent, cutting of the position ID.
                 self.opponent_id = str(actor).rsplit("_", 1)[0]
+
                 if self.isFirstRound:
                     self.load_data()
                     self.isFirstRound = False
@@ -181,21 +181,17 @@ class SunAgent(DefaultParty):
         """
         # if it is an offer, set the last received bid
         if isinstance(action, Offer):
-            # create opponent model if it was not yet initialised
-            if self.opponent_model is None:
-                self.opponent_model = OpponentModel(self.domain)
-
             bid = cast(Offer, action).getBid()
 
-            if bid not in self.opponent_model.offers_unique:
-                progress_time = self.progress.get(time() * 1000)
-                self.gradientBoostingRegressor.add_opponent_offer_to_x(bid, progress_time)
+            if bid not in self.agent_brain.offers_unique:
+                self.agent_brain.add_opponent_offer_to_self_x_and_self_y(bid,
+                                                                         self.progress.get(time() * 1000))
+            self.agent_brain.keep_opponent_offer_in_a_list(bid)
 
             # update opponent model with bid
-            self.opponent_model.update(bid)
-            if len(self.opponent_model.offers_unique) > 4:
-                self.gradientBoostingRegressor.evaluate_data_according_to_lig_gbm()
-            self.profile_parser.getUtility(bid)
+            if len(self.agent_brain.offers_unique) > 4:
+                self.agent_brain.evaluate_data_according_to_lig_gbm()
+            self.profile_opponent_parser.getUtility(bid)
             # set bid as last received
             self.last_received_bid = bid
 
@@ -206,12 +202,11 @@ class SunAgent(DefaultParty):
         # check if the last received offer is good enough
         if self.accept_condition(self.last_received_bid):
             # if so, accept the offer
-            print("I accept")
-            time.sleep(2.4)
             action = Accept(self.me, self.last_received_bid)
         else:
             # if not, find a bid to propose as counter offer
-            bid = self.find_bid()
+            progress_time = self.progress.get(time() * 1000)
+            bid = self.agent_brain.find_bid(progress_time)
             action = Offer(self.me, bid)
 
         # send the action
@@ -223,10 +218,10 @@ class SunAgent(DefaultParty):
         Taking too much time might result in your agent being killed, so use it for storage only.
         """
         if 'offerNumberUnique' in self.storage_data.keys():
-            self.storage_data['offerNumberUnique'].append(len(self.opponent_model.offers_unique))
+            self.storage_data['offerNumberUnique'].append(len(self.agent_brain.offers_unique))
         else:
-            self.storage_data['offerNumberUnique'] = [len(self.opponent_model.offers_unique)]
-        mae = self.gradientBoostingRegressor.get_average_of_mae()
+            self.storage_data['offerNumberUnique'] = [len(self.agent_brain.offers_unique)]
+        mae = self.agent_brain.get_average_of_mae()
         print("Average mae" + str(mae))
         self.store_rmse_in_local_storage(mae)
 
@@ -235,13 +230,14 @@ class SunAgent(DefaultParty):
             f.write(json.dumps(self.storage_data))
 
     def load_data(self):
-        if self.opponent_id is not None:
+        if self.opponent_id is not None and self.storage_dir is not None:
             try:
                 with open(self.storage_dir + "/" + self.opponent_id + "data.md") as file:
                     self.storage_data = json.load(file)
                     print("I load data from storage")
-            except:
-                print("Error skip")
+                    self.this_session_is_first_match_for_this_opponent = False
+            except Exception:
+                pass
 
     ###########################################################################################
     ################################## Example methods below ##################################
@@ -254,33 +250,8 @@ class SunAgent(DefaultParty):
         # progress of the negotiation session between 0 and 1 (1 is deadline)
         progress = self.progress.get(time() * 1000)
 
-        # very basic approach that accepts if the offer is valued above 0.7 and
-        # 95% of the time towards the deadline has passed
-        conditions = [
-            self.profile.getUtility(bid) > 0.83,
-            progress > 0.97,
-        ]
-        return all(conditions)
+        return self.agent_brain.is_acceptable(bid, progress)
 
-    def find_bid(self) -> Bid:
-        # compose a list of all possible bids
-        domain = self.profile.getDomain()
-        all_bids = AllBidsList(domain)
-
-        best_bid_score = 0.0
-        best_bid = all_bids.get(randint(0, all_bids.size() - 1))
-        if self.sorted_bids is not None:
-            bid_index = randint(0, int(len(self.sorted_bids) * 0.002))
-            best_bid = self.sorted_bids[bid_index]
-
-        # take 500 attempts to find a bid according to a heuristic score
-        for _ in range(50):
-            bid = all_bids.get(randint(0, all_bids.size() - 1))
-            bid_score = self.score_bid(bid)
-            if bid_score > 0.98:
-                best_bid = bid
-        # print("my uti:" + str(self.profile.getUtility(best_bid)))
-        return best_bid
 
     def score_bid(self, bid: Bid, alpha: float = 0.95, eps: float = 0.1) -> float:
         """Calculate heuristic score for a bid
@@ -302,8 +273,8 @@ class SunAgent(DefaultParty):
         """time_pressure = 1.0 - progress ** (1 / eps)
         score = alpha * time_pressure * our_utility
 
-        if self.opponent_model is not None:
-            opponent_utility = self.opponent_model.get_predicted_utility(bid)
+        if self.agent_brain is not None:
+            opponent_utility = self.agent_brain.get_predicted_utility(bid)
             opponent_score = (1.0 - alpha * time_pressure) * opponent_utility
             score += opponent_score"""
 
@@ -588,13 +559,14 @@ def deep_analysis_for_machine_learning():
     json_path = ".json"
     result = []
     param_result = []
-    for i in range(2, 7, 1):
+    objective = ['cross_entropy', 'lambdarank', 'regression', 'huber', 'mape']
+    for objective in objective:
         param = {
-            'objective': 'regression',
+            'objective': objective,
             'learning_rate': 0.05,
             'force_row_wise': True,
             'feature_fraction': 1,
-            'max_depth': i,
+            'max_depth': 2,
             'num_leaves': 4,
             'boosting': 'gbdt',
             'min_data': 1,
@@ -603,10 +575,10 @@ def deep_analysis_for_machine_learning():
         average_mae_agent = []
         average_mae_oppo = []
 
-        for j in range(20, 50, 10):
+        for j in range(20, 39, 10):
             bid_number_that_random = j
 
-            for k in [28, 15, 25]:
+            for k in range(0, 50):
                 stringNumber = str(k).zfill(2)
                 print(stringNumber)
                 domain_opponent = domain + stringNumber + profileJsonOfOpponent
@@ -646,12 +618,12 @@ def deep_analysis_for_machine_learning():
                                               key=lambda x: profile_parser_opponent.getUtility_for_testing(x),
                                               reverse=True)
 
-                opponent_reg = GradientBoostingRegressorModel(profile_parser_opponent, profile_parser_agent)
-                agent_reg = GradientBoostingRegressorModel(profile_parser_agent, profile_parser_opponent)
+                opponent_reg = AgentBrain(profile_parser_opponent, profile_parser_agent)
+                agent_reg = AgentBrain(profile_parser_agent, profile_parser_opponent)
 
-                agent_reg.add_domain_and_profile(domain_class, profile_parser_agent, profile_parser_opponent)
+                agent_reg.fill_domain_and_profile(domain_class, profile_parser_agent, profile_parser_opponent)
 
-                opponent_reg.add_domain_and_profile(domain_class, profile_parser_opponent, profile_parser_agent)
+                opponent_reg.fill_domain_and_profile(domain_class, profile_parser_opponent, profile_parser_agent)
 
                 agent_reg.param = param
                 opponent_reg.param = param
@@ -662,44 +634,44 @@ def deep_analysis_for_machine_learning():
                         bid_index = randint(0, int(50))
                         bid = sorted_bids_opponent[bid_index]
                         bid_list_agent.append(bid)
-                        agent_reg.add_opponent_offer_to_x(bid, 0.1)
+                        agent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
                     elif len(sorted_bids_opponent) > 1000:
                         bid_index = randint(0, int(20))
                         bid = sorted_bids_opponent[bid_index]
                         bid_list_agent.append(bid)
-                        agent_reg.add_opponent_offer_to_x(bid, 0.1)
+                        agent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
                     elif len(sorted_bids_opponent) > 20:
                         bid_index = randint(0, int(10))
                         bid = sorted_bids_opponent[bid_index]
                         bid_list_agent.append(bid)
-                        agent_reg.add_opponent_offer_to_x(bid, 0.1)
+                        agent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
                     else:
                         bid_index = randint(0, int(5))
                         bid = sorted_bids_opponent[bid_index]
                         bid_list_agent.append(bid)
-                        agent_reg.add_opponent_offer_to_x(bid, 0.1)
+                        agent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
                 bid_list_opponent = []
                 for m in range(1, bid_number_that_random):
                     if len(sorted_bids_agent) > 5000:
                         bid_index = randint(0, int(50))
                         bid = sorted_bids_agent[bid_index]
                         bid_list_agent.append(bid)
-                        opponent_reg.add_opponent_offer_to_x(bid, 0.1)
+                        opponent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
                     elif len(sorted_bids_agent) > 1000:
                         bid_index = randint(0, int(20))
                         bid = sorted_bids_agent[bid_index]
                         bid_list_agent.append(bid)
-                        opponent_reg.add_opponent_offer_to_x(bid, 0.1)
+                        opponent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
                     elif len(sorted_bids_agent) > 20:
                         bid_index = randint(0, int(10))
                         bid = sorted_bids_agent[bid_index]
                         bid_list_agent.append(bid)
-                        opponent_reg.add_opponent_offer_to_x(bid, 0.1)
+                        opponent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
                     else:
                         bid_index = randint(0, int(1))
                         bid = sorted_bids_opponent[bid_index]
                         bid_list_agent.append(bid)
-                        opponent_reg.add_opponent_offer_to_x(bid, 0.1)
+                        opponent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
                 start = timer()
 
                 agent_reg.param = param
@@ -767,7 +739,7 @@ def corrolation_analyses():
     domain_analysis_dict = pd.DataFrame()
 
     value_dict = {}
-    for k in range(4, 50):
+    for k in range(0, 50):
         stringNumber = str(k).zfill(2)
         print(stringNumber)
         domain_opponent = domain + stringNumber + profileJsonOfOpponent
@@ -819,7 +791,7 @@ def corrolation_analyses():
         """
         storage_data = None
         try:
-            with open("result1_5.md") as file:
+            with open("result1gamma.md") as file:
                 storage_data = json.load(file)
             print("I load data from storage")
         except:
@@ -896,9 +868,66 @@ def corrolation_analyses():
     print("corr")
 
 
+def domain_analyses():
+    domain = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
+    domain_path_1 = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
+    profileJsonOfOpponent = "/profileA.json"
+    profileJsonOfAgent = "/profileB.json"
+    json_path = ".json"
+
+    domain_analysis_dict = pd.DataFrame()
+
+    value_dict = {}
+    a = []
+    for k in range(0, 50):
+        stringNumber = str(k).zfill(2)
+        print(stringNumber)
+        domain_opponent = domain + stringNumber + profileJsonOfOpponent
+        domain_agent = domain + stringNumber + profileJsonOfAgent
+
+        profile_parser_agent = ProfileParser()
+        profile_parser_agent.parse(domain_agent)
+        profile_parser_opponent = ProfileParser()
+        profile_parser_opponent.parse(domain_opponent)
+
+        domain_path = domain_path_1 + stringNumber + "/domain" + stringNumber + json_path
+
+        with open(domain_path) as file:
+            domain_data = json.load(file)
+        name = "domain_name"
+        issue_values: Dict[str, ValueSet] = {}
+        for issue_dict in domain_data['issuesValues'].keys():
+            mp: List[ImmutableList[Value]] = []
+            for value in domain_data['issuesValues'][issue_dict]['values']:
+                mp.append(cast(Value, value))
+            issue_values[issue_dict] = cast(ImmutableList[Value], mp)
+            # issue_values[issue_dict] = cast(Value,issue_values[issue_dict]['values'])
+
+        domain_class = Domain(name, issue_values)
+        """issues: List[Set[str]] = list(domain_class.getIssues())
+        values: List[ImmutableList[Value]] = [domain_class.getValues(issue) for issue in issues]
+        all_bids: Outer = Outer[Value](values)"""
+        for issue_dict in issue_values:
+            values: List[ImmutableList[Value]] = [domain_class.getValues(issue) for issue in issue_values]
+            issue_values[issue_dict]: List[ImmutableList[Value]] = values
+        all_bids_list = AllBidsList(domain_class)
+
+        sorted_nash = sorted(all_bids_list,
+                             key=lambda x: profile_parser_agent.getUtility_for_testing(
+                                 x) + profile_parser_opponent.getUtility_for_testing(x),
+                             reverse=True)
+        b = profile_parser_agent.getUtility_for_testing(
+            sorted_nash[0]) + profile_parser_opponent.getUtility_for_testing(sorted_nash[0])
+        a.append(b)
+    print("mean: " + str(np.mean(a)) + "max + " + str(np.max(a)) + "min: " + str(np.min(a)))
+
+
+"""
 if __name__ == "__main__":
-    bool: bool = True
-    if bool:
+    if False:
         deep_analysis_for_machine_learning()
-    if not bool:
+    if False:
         corrolation_analyses()
+    if True:
+        domain_analyses()
+"""

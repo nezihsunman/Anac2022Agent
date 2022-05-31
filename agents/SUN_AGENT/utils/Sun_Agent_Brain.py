@@ -1,23 +1,24 @@
 import json
-import statistics
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import mean_absolute_error
 
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
-from bisect import bisect
-
 from agents.SUN_AGENT.utils.profile_parser import ProfileParser
 
 from geniusweb.bidspace.AllBidsList import AllBidsList
+from geniusweb.issuevalue.Bid import Bid
 
 
-class GradientBoostingRegressorModel:
+class AgentBrain:
     def __init__(self, profile_parser_agent: ProfileParser, profile_parser_oppo: ProfileParser, ):
+        self.reservationBid: Bid = None
+        self.sorted_bids_agent = None
+        self.all_bid_list = None
+
         self.num_round = 100
         self.param = None
-        # dont Forget verbose in tornamet
-        num_round = 100
+
         self.y_test = None
         self.x_test = None
         self.lgb_model = None
@@ -32,29 +33,33 @@ class GradientBoostingRegressorModel:
 
         self.average_mse = []
 
-    def add_opponent_offer_to_x(self, bid, progress_time):
-        # Gönderilen bid benim için 0.6 ve 0.9 arasında ise oponent modele ekle
-        # if Decimal(0.3) < self.profile.getUtility(bid) < Decimal(1):
+        self.offers = []
+        self.offers_unique = []
+
+    def keep_opponent_offer_in_a_list(self, bid: Bid):
+        # keep track of all bids received
+        self.offers.append(bid)
+
+        if bid not in self.offers_unique:
+            self.offers_unique.append(bid)
+
+    def add_opponent_offer_to_self_x_and_self_y(self, bid, progress_time):
         bid_value_array = self.get_bid_value_array_for_data_frame_usage(bid)
         df = pd.DataFrame(bid_value_array)
         df = self.enumerate(df)
         self.X = pd.concat([self.X, df])
 
         """Y tarafına öyle bir değişken atamalıyım ki adamın utilitisi olmalı (kendi utilitime göre olsa daha mantıklı olabilir gibi şimdilik)"""
-        new = pd.DataFrame([(float(1) - (float(0.2) * (float(progress_time))))])
-        new = pd.DataFrame([self.profile_parser_oppo.getUtility(bid)])
+        new = pd.DataFrame([(float(0.95) - (float(0.2) * (float(progress_time))))])
+        # Testing
+        # new = pd.DataFrame([self.profile_parser_oppo.getUtility(bid)])
 
         self.Y = pd.concat([self.Y, new])
 
-    def get_bid_value_array_for_data_frame_usage(self, bid):
-        bid_value_array = {}
-        for issue in self.issue_name_list:
-            bid_value_array[issue] = [bid.getValue(issue)]
-        return bid_value_array
-
-    def add_domain_and_profile(self, domain, profile, profile_parser_opponent):
+    def fill_domain_and_profile(self, domain, profile, profile_parser_opponent):
         self.domain = domain
         self.profile = profile
+        self.reservationBid = self.profile.getReservationBid()
         self.profile_parser_agent = profile
 
         self.profile_parser_oppo = profile_parser_opponent
@@ -63,8 +68,23 @@ class GradientBoostingRegressorModel:
         self.Y = pd.DataFrame()
         self.temEnumDict = self.enumerate_enum_dict()
         self.set_profile_test_data()
+        self.all_bid_list = AllBidsList(domain)
+
+        self.sorted_bids_agent = sorted(self.all_bid_list,
+                                        key=lambda x: self.profile.getUtility(x),
+                                        reverse=True)
 
     def evaluate_data_according_to_lig_gbm(self):
+        self.train_machine_learning_model()
+        return self.test_machine_learning_model()
+
+    def test_machine_learning_model(self):
+        y_pred = self.lgb_model.predict(self.x_test)
+        mae = mean_absolute_error(self.y_test, y_pred)
+        self.average_mse.append(float(mae))
+        return mae
+
+    def train_machine_learning_model(self):
         issueList = []
         for issue in self.domain.getIssues():
             issueList.append(issue)
@@ -72,39 +92,35 @@ class GradientBoostingRegressorModel:
             self.X[col] = self.X[col].astype('int')
         self.Y = self.Y.astype('float')
         train_data = lgb.Dataset(self.X, label=self.Y, feature_name=issueList)
-
         if self.param is None:
+            objective = ['cross_entropy', 'lambdarank', 'regression', 'huber', 'mape']
             self.param = {
-                'objective': 'regression',
+                'objective': 'cross_entropy',
                 'learning_rate': 0.05,
                 'force_row_wise': True,
                 'feature_fraction': 1,
-                'max_depth': len(self.issue_name_list),
-                'num_leaves': int((2 ** len(self.issue_name_list) / 4)),
+                'max_depth': 2,
+                'num_leaves': 4,
                 'boosting': 'gbdt',
                 'min_data': 1,
                 'verbose': -1
             }
-
         self.lgb_model = lgb.train(self.param, train_data, self.num_round)
-
-        y_pred = self.lgb_model.predict(self.x_test)
-        mae = mean_absolute_error(self.y_test, y_pred)
-        self.average_mse.append(float(mae))
-        return mae
-
-    """def _call_model_gradient_b_r(self, x):
-        prediction = self.gradientBoostingRegressor.predict(self._bid_to_enumerated_df(x))
-        return prediction[0]"""
 
     def _call_model_lgb(self, bid):
         if self.lgb_model:
-            prediction = self.lgb_model.predict(self._bid_to_enumerated_df(bid))
+            prediction = self.lgb_model.predict(self._bid_for_model_prediction_to_df(bid))
             return prediction[0]
         else:
             return 0
 
-    def _bid_to_enumerated_df(self, bid):
+    def get_bid_value_array_for_data_frame_usage(self, bid):
+        bid_value_array = {}
+        for issue in self.issue_name_list:
+            bid_value_array[issue] = [bid.getValue(issue)]
+        return bid_value_array
+
+    def _bid_for_model_prediction_to_df(self, bid):
         df_temp = pd.DataFrame(self.get_bid_value_array_for_data_frame_usage(bid))
         df_temp = self.enumerate(df_temp)
         return df_temp
@@ -153,11 +169,14 @@ class GradientBoostingRegressorModel:
         return parsed
 
     def util_add_agent_first_n_bid_to_machine_learning_with_low_utility(self, bid, ratio):
+        """self.train_machine_learning_model()
+        real_utility_of_opponent = self.profile_parser_oppo.getUtility(bid)
+        estimated_utility_before_adding_data = self.lgb_model.predict(self._bid_for_model_prediction_to_df(bid))"""
         bid_value_array = self.get_bid_value_array_for_data_frame_usage(bid)
         df = pd.DataFrame(bid_value_array)
         df = self.enumerate(df)
         self.X = pd.concat([self.X, df])
-        util = float(float(0.07) + (float(ratio) * float(0.35)))
+        util = float(float(0.3) + (float(ratio) * float(0.35)))
         """Y tarafına öyle bir değişken atamalıyım ki adamın utilitisi olmalı (kendi utilitime göre olsa daha mantıklı olabilir gibi şimdilik)"""
         new = pd.DataFrame([util])
 
@@ -166,19 +185,26 @@ class GradientBoostingRegressorModel:
     def add_agent_first_n_bid_to_machine_learning_with_low_utility(self, sorted_bids_agent):
         bid_number = 4
         if len(sorted_bids_agent) > 10000:
-            bid_number = 50
+            bid_number = 30
         elif len(sorted_bids_agent) > 5000:
-            bid_number = 35
-        elif len(sorted_bids_agent) > 4000:
             bid_number = 25
-        elif len(sorted_bids_agent) > 2000:
+        elif len(sorted_bids_agent) > 4000:
             bid_number = 15
+        elif len(sorted_bids_agent) > 2000:
+            bid_number = 7
         elif len(sorted_bids_agent) > 1000:
-            bid_number = 10
-        for i in range(1, bid_number + 1):
+            bid_number = 5
+        for i in range(0, bid_number + 1):
             bid = sorted_bids_agent[i]
             self.util_add_agent_first_n_bid_to_machine_learning_with_low_utility(bid,
                                                                                  float(float(i) / float(bid_number)))
+
+    def is_acceptable(self, bid: Bid, progress):
+        if self.profile.getUtility(bid) > 0.95:
+            return True
+
+    def find_bid(self, progress_time):
+        return self.sorted_bids_agent[0]
 
 
 """def evaluate_model_and_compare(self):
