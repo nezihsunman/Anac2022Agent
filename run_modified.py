@@ -21,7 +21,7 @@ def main():
     domain = "domains/domain"
     profileJsonOfOpponent = "/profileA.json"
     profileJsonOfAgent = "/profileB.json"
-    for i in range(12, 16):
+    for i in range(15, 16):
         stringNumber = str(i).zfill(2)
         print(stringNumber)
         settings = {

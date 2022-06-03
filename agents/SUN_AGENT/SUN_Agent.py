@@ -103,8 +103,13 @@ class SunAgent(DefaultParty):
                 self.sorted_bids = sorted(all_bids, key=lambda x: self.profile.getUtility(x),
                                           reverse=True)
             """Agent Model"""
+            path = ""
+            if 'profileA' == self.profile.getName():
+                path = "domains/" + self.domain.getName() + "/profileB.json"
+            else:
+                path = "domains/" + self.domain.getName() + "/profileA.json"
 
-            self.profile_opponent_parser.parse(self.parameters.get("profiles_domain_of_opponent"))
+            self.profile_opponent_parser.parse(path)
 
             self.agent_brain.fill_domain_and_profile(self.domain, self.profile,
                                                      self.profile_opponent_parser)
@@ -125,9 +130,9 @@ class SunAgent(DefaultParty):
                 if self.isFirstRound:
                     self.load_data()
                     self.isFirstRound = False
-
                 # process action done by opponent
                 self.opponent_action(action)
+
         # YourTurn notifies you that it is your turn to act
         elif isinstance(data, YourTurn):
             # execute a turn
@@ -189,8 +194,8 @@ class SunAgent(DefaultParty):
             self.agent_brain.keep_opponent_offer_in_a_list(bid)
 
             # update opponent model with bid
-            if len(self.agent_brain.offers_unique) > 4:
-                self.agent_brain.evaluate_data_according_to_lig_gbm()
+            self.agent_brain.evaluate_data_according_to_lig_gbm(self.progress.get(time() * 1000))
+
             self.profile_opponent_parser.getUtility(bid)
             # set bid as last received
             self.last_received_bid = bid
@@ -251,7 +256,6 @@ class SunAgent(DefaultParty):
         progress = self.progress.get(time() * 1000)
 
         return self.agent_brain.is_acceptable(bid, progress)
-
 
     def score_bid(self, bid: Bid, alpha: float = 0.95, eps: float = 0.1) -> float:
         """Calculate heuristic score for a bid
@@ -919,7 +923,74 @@ def domain_analyses():
         b = profile_parser_agent.getUtility_for_testing(
             sorted_nash[0]) + profile_parser_opponent.getUtility_for_testing(sorted_nash[0])
         a.append(b)
+        value_dict['agent_opponnet_max_sum_util'] = float(b)
+        average_list_agent = []
+        average_list_opponent = []
+        greater_than_095_agent = []
+        greater_than_090_agent = []
+        greater_than_085_agent = []
+        greater_than_095_opponent = []
+        greater_than_090_opponent = []
+        greater_than_085_opponent = []
+        sorted_bids_agent = sorted(all_bids_list,
+                                   key=lambda x: profile_parser_agent.getUtility_for_testing(x),
+                                   reverse=True)
+        sorted_bids_opponent = sorted(all_bids_list,
+                                      key=lambda x: profile_parser_opponent.getUtility_for_testing(x),
+                                      reverse=True)
+        for x in sorted_bids_agent:
+            util = profile_parser_agent.getUtility_for_testing(x)
+            average_list_agent.append(util)
+            if float(util) > float(0.95):
+                greater_than_095_agent.append(util)
+            elif float(util) > float(0.90):
+                greater_than_090_agent.append(util)
+            elif float(util) > float(0.85):
+                greater_than_085_agent.append(util)
+
+        for x in sorted_bids_opponent:
+            util = profile_parser_opponent.getUtility_for_testing(x)
+            average_list_opponent.append(util)
+            if float(util) > float(0.95):
+                greater_than_095_opponent.append(util)
+            elif float(util) > float(0.90):
+                greater_than_090_opponent.append(util)
+            elif float(util) > float(0.85):
+                greater_than_085_opponent.append(util)
+        percantage_of_greater_than95_agent = float(len(greater_than_095_agent)) / float(len(average_list_agent))
+        percantage_of_greater_than90_agent = float(len(greater_than_090_agent)) / float(len(average_list_agent))
+        percantage_of_greater_than85_agent = float(len(greater_than_085_agent)) / float(len(average_list_agent))
+        percantage_of_greater_than95_opponent = float(len(greater_than_095_opponent)) / float(
+            len(average_list_opponent))
+        percantage_of_greater_than90_opponent = float(len(greater_than_090_opponent)) / float(
+            len(average_list_opponent))
+        percantage_of_greater_than85_opponent = float(len(greater_than_085_opponent)) / float(
+            len(average_list_opponent))
+        average = np.mean(average_list_agent)
+        std = np.std(average_list_agent)
+        list_size_agent = len(average_list_agent)
+        list_size_oppo = len(average_list_opponent)
+        value_dict['average'] = [average]
+        value_dict['std'] = [std]
+        value_dict['percantage_of_greater_than85_agent'] = [percantage_of_greater_than85_agent]
+        value_dict['percantage_of_greater_than90_agent'] = [percantage_of_greater_than90_agent]
+        value_dict['percantage_of_greater_than95_agent'] = [percantage_of_greater_than95_agent]
+        value_dict['percantage_of_greater_than85_opponent'] = [percantage_of_greater_than85_opponent]
+        value_dict['percantage_of_greater_than90_opponent'] = [percantage_of_greater_than90_opponent]
+        value_dict['percantage_of_greater_than95_opponent'] = [percantage_of_greater_than95_opponent]
+        value_dict['list_size_oppo'] = [list_size_oppo]
+        value_dict['list_size_agent'] = [list_size_agent]
+        value_dict['domain_opponent'] = [domain_opponent]
+        value_dict['domain_agent'] = [domain_agent]
+        value_dict['domain_res_agent'] = [domain_agent]
+
+        df = pd.DataFrame.from_dict(value_dict)
+        domain_analysis_dict = pd.concat([domain_analysis_dict, df])
+
     print("mean: " + str(np.mean(a)) + "max + " + str(np.max(a)) + "min: " + str(np.min(a)))
+
+    corr = domain_analysis_dict.corr(method="kendall")
+    print("cor")
 
 
 """

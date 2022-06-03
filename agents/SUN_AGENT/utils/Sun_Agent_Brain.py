@@ -1,4 +1,7 @@
 import json
+import random
+import time
+
 from sklearn.metrics import mean_absolute_error
 
 import numpy as np
@@ -12,8 +15,11 @@ from geniusweb.issuevalue.Bid import Bid
 
 class AgentBrain:
     def __init__(self, profile_parser_agent: ProfileParser, profile_parser_oppo: ProfileParser, ):
+        self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent = None
+        self.sorted_bids_agent_df = None
         self.reservationBid: Bid = None
         self.sorted_bids_agent = None
+        self.sorted_bids_agent_that_greater_than_goal_of_utility = []
         self.all_bid_list = None
 
         self.num_round = 100
@@ -35,6 +41,19 @@ class AgentBrain:
 
         self.offers = []
         self.offers_unique = []
+
+        self.number_of_bid_greater_than95 = 0
+        self.percentage_of_greater_than95 = 0
+
+        self.number_of_bid_greater_than85 = 0
+        self.percentage_of_greater_than85 = 0
+
+        self.goal_of_utility = 0.80
+        self.number_of_goal_of_utility = None
+
+    @staticmethod
+    def get_goal_of_negoation_utility(x):
+        return (float(-57.57067183) * float(x) * float(x) + float(x) * float(7.50261378) + float(1.59499339)) / float(2)
 
     def keep_opponent_offer_in_a_list(self, bid: Bid):
         # keep track of all bids received
@@ -73,10 +92,60 @@ class AgentBrain:
         self.sorted_bids_agent = sorted(self.all_bid_list,
                                         key=lambda x: self.profile.getUtility(x),
                                         reverse=True)
+        self.calculate_percantage_and_number()
+        self.add_agent_first_n_bid_to_machine_learning_with_low_utility(self.sorted_bids_agent)
 
-    def evaluate_data_according_to_lig_gbm(self):
-        self.train_machine_learning_model()
-        return self.test_machine_learning_model()
+    def calculate_percantage_and_number(self):
+        numb_95 = 0
+        numb_85 = 0
+        for i in self.sorted_bids_agent:
+            if self.profile.getUtility(i) > float(0.95):
+                numb_95 = numb_95 + 1
+            if self.profile.getUtility(i) > float(0.85):
+                numb_85 = numb_85 + 1
+            else:
+                break
+        self.number_of_bid_greater_than95 = numb_95
+        self.number_of_bid_greater_than85 = numb_85
+
+        self.percentage_of_greater_than95 = float(self.number_of_bid_greater_than95) / float(
+            len(self.sorted_bids_agent))
+        self.percentage_of_greater_than85 = float(self.number_of_bid_greater_than85) / float(
+            len(self.sorted_bids_agent))
+
+        self.goal_of_utility = self.get_goal_of_negoation_utility(self.percentage_of_greater_than85) + float(0.01)
+        numb_goal_util = 0
+        self.sorted_bids_agent_df = pd.DataFrame()
+        for i in self.sorted_bids_agent:
+            utility = float(self.profile.getUtility(i))
+            if utility > float(self.goal_of_utility):
+                numb_goal_util = numb_goal_util + 1
+            if utility > (float(self.goal_of_utility) - float(0.02)):
+                self.sorted_bids_agent_that_greater_than_goal_of_utility.append(i)
+                df_temp = pd.DataFrame(self.get_bid_value_array_for_data_frame_usage(i))
+                df_temp = self.enumerate(df_temp)
+                self.sorted_bids_agent_df = pd.concat([self.sorted_bids_agent_df, df_temp])
+            else:
+                break
+        self.number_of_goal_of_utility = numb_goal_util
+
+    def evaluate_opponent_utility_for_all_my_important_bid(self, progress_time):
+        self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent = []
+        util_of_opponent = self.lgb_model.predict(self.sorted_bids_agent_df)
+        for index, i in enumerate(self.sorted_bids_agent_that_greater_than_goal_of_utility):
+            util = float(self.profile.getUtility(i))
+            if ((float(0.95) - ((float(0.95) - self.goal_of_utility) * float(progress_time))) > util) \
+                    and (util_of_opponent[index] > (
+                    float(0.2) + ((float(self.goal_of_utility) / float(2)) * float(progress_time)))) \
+                    and util_of_opponent[index] < util + float(0.15):
+                self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent.append(i)
+
+    def evaluate_data_according_to_lig_gbm(self, progress_time):
+        length = len(self.offers_unique)
+        if length >= 1 and (length % 4) == 0:
+            self.train_machine_learning_model()
+            self.evaluate_opponent_utility_for_all_my_important_bid(progress_time)
+            return self.test_machine_learning_model()
 
     def test_machine_learning_model(self):
         y_pred = self.lgb_model.predict(self.x_test)
@@ -204,6 +273,16 @@ class AgentBrain:
             return True
 
     def find_bid(self, progress_time):
+        if progress_time > 0 and self.lgb_model is not None:
+            if len(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent) > 1:
+                index = random.randint(0,
+                                       len(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent) - 1)
+                return self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent[index]
+
+        elif progress_time < 0.9:
+            index = random.randint(0, self.number_of_goal_of_utility)
+            return self.sorted_bids_agent[index]
+
         return self.sorted_bids_agent[0]
 
 
