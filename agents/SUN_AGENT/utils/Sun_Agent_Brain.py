@@ -125,7 +125,6 @@ class AgentBrain:
 
         self.goal_of_utility = self.get_goal_of_negoation_utility(float(self.percentage_of_greater_than85)) + float(
             0.01)
-        print("goal " + str(self.goal_of_utility))
         numb_goal_util = 0
         self.sorted_bids_agent_df = pd.DataFrame()
         self.sorted_bids_agent_that_greater_than_065_df = pd.DataFrame()
@@ -164,14 +163,6 @@ class AgentBrain:
         if length >= 1 and (length % 2) == 0:
             self.train_machine_learning_model()
             self.evaluate_opponent_utility_for_all_my_important_bid(progress_time)
-
-    def test_machine_learning_model(self):
-        y_pred = self.lgb_model.predict(self.x_test)
-        mae = mean_absolute_error(self.y_test, y_pred)
-        print("Mae" + str(mae) + "len" + str(len(self.offers_unique)))
-
-        self.average_mse.append(float(mae))
-        return float(mae)
 
     def train_machine_learning_model(self):
         issue_list = []
@@ -251,32 +242,19 @@ class AgentBrain:
 
         if self.number_of_goal_of_utility > 150:
             bid_number = 40
-            print("considered bid number " + str(bid_number) + "goal " + str(self.number_of_goal_of_utility))
-
         elif self.number_of_goal_of_utility > 100:
             bid_number = int(float(self.number_of_goal_of_utility) / float(3.4))
-            print("considered bid number " + str(bid_number) + "goal " + str(self.number_of_goal_of_utility))
-
         elif self.number_of_goal_of_utility > 80:
             bid_number = int(float(self.number_of_goal_of_utility) / float(3.1))
-            print("considered bid number " + str(bid_number) + "goal " + str(self.number_of_goal_of_utility))
-
         elif self.number_of_goal_of_utility > 50:
             bid_number = int(float(self.number_of_goal_of_utility) / float(3))
-            print("considered bid number " + str(bid_number) + "goal " + str(self.number_of_goal_of_utility))
-
         elif self.number_of_goal_of_utility > 30:
             bid_number = 9
-            print("considered bid number " + str(bid_number) + "goal " + str(self.number_of_goal_of_utility))
-
         elif self.number_of_goal_of_utility > 18:
             bid_number = 7
-            print("considered bid number " + str(bid_number) + "goal " + str(self.number_of_goal_of_utility))
         elif 16 > self.number_of_goal_of_utility > 8:
             bid_number = int(float(self.number_of_goal_of_utility) / float(2))
-            print("considered bid number " + str(bid_number) + "goal " + str(self.number_of_goal_of_utility))
         else:
-            print("else")
             bid_number = 4
         for i in range(0, bid_number + 1):
             bid = sorted_bids_agent[i]

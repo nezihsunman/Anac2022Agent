@@ -222,7 +222,6 @@ class SunAgent(DefaultParty):
             try:
                 with open(self.storage_dir + "/" + self.opponent_id + "data.md") as file:
                     self.storage_data = json.load(file)
-                    print("I load data from storage")
                     self.this_session_is_first_match_for_this_opponent = False
             except Exception:
                 pass

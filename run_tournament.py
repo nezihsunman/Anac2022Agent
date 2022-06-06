@@ -54,7 +54,7 @@ tournament_settings = {
         ["domains/domain48/profileA.json", "domains/domain48/profileB.json"],
         ["domains/domain49/profileA.json", "domains/domain49/profileB.json"]
     ],
-    "deadline_time_ms": 60000,
+    "deadline_time_ms": 20000,
     #"deadlinerounds":{"rounds":100,"durationms":999}
 }
 
