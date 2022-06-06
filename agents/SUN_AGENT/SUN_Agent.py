@@ -210,10 +210,6 @@ class SunAgent(DefaultParty):
             self.storage_data['domainName'].append(self.domain.getName())
         else:
             self.storage_data['domainName'] = [self.domain.getName()]
-
-        mae = self.agent_brain.get_average_of_mae()
-        self.store_rmse_in_local_storage(mae)
-
         with open(f"{self.storage_dir}/{self.opponent_id}data.md", "w") as f:
             f.write(json.dumps(self.storage_data))
 
@@ -226,10 +222,6 @@ class SunAgent(DefaultParty):
             except Exception:
                 pass
 
-    ###########################################################################################
-    ################################## Example methods below ##################################
-    ###########################################################################################
-
     def accept_condition(self, bid: Bid) -> bool:
         if bid is None:
             return False
@@ -238,36 +230,3 @@ class SunAgent(DefaultParty):
         progress = self.progress.get(time() * 1000)
 
         return self.agent_brain.is_acceptable(bid, progress)
-
-    def score_bid(self, bid: Bid, alpha: float = 0.95, eps: float = 0.1) -> float:
-        """Calculate heuristic score for a bid
-
-        Args:
-            bid (Bid): Bid to score
-            alpha (float, optional): Trade-off factor between self interested and
-                altruistic behaviour. Defaults to 0.95.
-            eps (float, optional): Time pressure factor, balances between conceding
-                and Boulware behaviour over time. Defaults to 0.1.
-
-        Returns:
-            float: score
-        """
-        progress = self.progress.get(time() * 1000)
-
-        our_utility = float(self.profile.getUtility(bid))
-
-        """time_pressure = 1.0 - progress ** (1 / eps)
-        score = alpha * time_pressure * our_utility
-
-        if self.agent_brain is not None:
-            opponent_utility = self.agent_brain.get_predicted_utility(bid)
-            opponent_score = (1.0 - alpha * time_pressure) * opponent_utility
-            score += opponent_score"""
-
-        return our_utility
-
-    def store_rmse_in_local_storage(self, rmse):
-        if 'mae' in self.storage_data.keys():
-            self.storage_data['mae'].append(rmse)
-        else:
-            self.storage_data['mae'] = [rmse]

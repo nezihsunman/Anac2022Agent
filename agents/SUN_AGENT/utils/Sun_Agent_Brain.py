@@ -1,10 +1,5 @@
 import json
 import random
-import time
-
-from sklearn.metrics import mean_absolute_error
-
-import numpy as np
 import pandas as pd
 import lightgbm as lgb
 
@@ -15,11 +10,11 @@ from geniusweb.issuevalue.Bid import Bid
 class AgentBrain:
     def __init__(self):
 
-        self.sorted_bids_agent_that_greater_than_065_df = None
+        self.sorted_bids_agent_that_greater_than_065_df = pd.DataFrame()
         self.sorted_bids_agent_that_greater_than_065 = []
 
         self.reservationBid_utility = float(0)
-        self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent = None
+        self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent = []
         self.sorted_bids_agent_df = None
         self.reservationBid: Bid = None
         self.sorted_bids_agent = None
@@ -28,17 +23,15 @@ class AgentBrain:
 
         self.param = None
 
-        self.y_test = None
-        self.x_test = None
         self.lgb_model = None
+
         self.X = pd.DataFrame()
         self.Y = pd.DataFrame()
+
         self.domain = None
         self.profile = None
         self.issue_name_list = None
         self.temEnumDict = None
-
-        self.average_mse = []
 
         self.offers = []
         self.offers_unique = []
@@ -141,7 +134,8 @@ class AgentBrain:
                 self.sorted_bids_agent_that_greater_than_065.append(i)
                 df_temp = pd.DataFrame(self.get_bid_value_array_for_data_frame_usage(i))
                 df_temp = self.enumerate(df_temp)
-                self.sorted_bids_agent_that_greater_than_065_df = pd.concat([self.sorted_bids_agent_df, df_temp])
+                self.sorted_bids_agent_that_greater_than_065_df = pd.concat(
+                    [self.sorted_bids_agent_that_greater_than_065_df, df_temp])
             else:
                 break
         self.number_of_goal_of_utility = numb_goal_util
@@ -216,11 +210,6 @@ class AgentBrain:
             df[issue] = df[issue].map(self.temEnumDict[issue])
         return df
 
-    def get_average_of_mae(self):
-        if len(self.average_mse) == 0:
-            return float(-1)
-        return np.mean(self.average_mse)
-
     def model_feature_importance(self):
         df = pd.DataFrame({'Value': self.lgb_model.feature_importance(), 'Feature': self.X.columns})
         df = pd.DataFrame({'Value': self.lgb_model.feature_importance(), 'Feature': self.X.columns})
@@ -265,7 +254,7 @@ class AgentBrain:
         util = float(self.profile.getUtility(bid))
         if util >= 0.94:
             return True
-        elif util >= 0.92 and 0.78 > float(self.call_model_lgb(bid)):
+        elif util >= 0.92 and 0.76 > float(self.call_model_lgb(bid)) > 0.6:
             return True
         elif 0.94 > float(progress) > 0.85 and util > self.goal_of_utility - float(0.28) and util - float(0.20) > float(
                 self.call_model_lgb(bid)):
