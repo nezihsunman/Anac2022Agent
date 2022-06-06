@@ -7,14 +7,13 @@ from sklearn.metrics import mean_absolute_error
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
-from agents.SUN_AGENT.utils.profile_parser import ProfileParser
 
 from geniusweb.bidspace.AllBidsList import AllBidsList
 from geniusweb.issuevalue.Bid import Bid
 
 
 class AgentBrain:
-    def __init__(self, profile_parser_agent: ProfileParser, profile_parser_oppo: ProfileParser, ):
+    def __init__(self):
 
         self.sorted_bids_agent_that_greater_than_065_df = None
         self.sorted_bids_agent_that_greater_than_065 = []
@@ -37,8 +36,6 @@ class AgentBrain:
         self.domain = None
         self.profile = None
         self.issue_name_list = None
-        self.profile_parser_agent = profile_parser_agent
-        self.profile_parser_oppo = profile_parser_oppo
         self.temEnumDict = None
 
         self.average_mse = []
@@ -87,20 +84,14 @@ class AgentBrain:
             val = (float(0.99) - (float(0.14) * (float(progress_time))))
             """Y tarafına öyle bir değişken atamalıyım ki adamın utilitisi olmalı (kendi utilitime göre olsa daha mantıklı olabilir gibi şimdilik)"""
             new = pd.DataFrame([val])
-            # Testing
-            # new = pd.DataFrame([self.profile_parser_oppo.getUtility(bid)])
-
             self.Y = pd.concat([self.Y, new])
 
-    def fill_domain_and_profile(self, domain, profile, profile_parser_opponent):
+    def fill_domain_and_profile(self, domain, profile):
         self.domain = domain
         self.profile = profile
         self.reservationBid = self.profile.getReservationBid()
         if self.reservationBid is not None:
             self.reservationBid_utility = self.profile.getUtility(self.reservationBid)
-        self.profile_parser_agent = profile
-
-        self.profile_parser_oppo = profile_parser_opponent
         self.issue_name_list = self.domain.getIssues()
         self.X = pd.DataFrame()
         self.Y = pd.DataFrame()
@@ -112,7 +103,6 @@ class AgentBrain:
                                         reverse=True)
         self.calculate_percantage_and_number()
         self.add_agent_first_n_bid_to_machine_learning_with_low_utility(self.sorted_bids_agent)
-        self.set_profile_test_data()
 
     def calculate_percantage_and_number(self):
         numb_95 = 0
@@ -174,7 +164,6 @@ class AgentBrain:
         if length >= 1 and (length % 2) == 0:
             self.train_machine_learning_model()
             self.evaluate_opponent_utility_for_all_my_important_bid(progress_time)
-            return self.test_machine_learning_model()
 
     def test_machine_learning_model(self):
         y_pred = self.lgb_model.predict(self.x_test)
@@ -185,15 +174,14 @@ class AgentBrain:
         return float(mae)
 
     def train_machine_learning_model(self):
-        issueList = []
+        issue_list = []
         for issue in self.domain.getIssues():
-            issueList.append(issue)
-        for col in issueList:
+            issue_list.append(issue)
+        for col in issue_list:
             self.X[col] = self.X[col].astype('int')
         self.Y = self.Y.astype('float')
-        train_data = lgb.Dataset(self.X, label=self.Y, feature_name=issueList)
+        train_data = lgb.Dataset(self.X, label=self.Y, feature_name=issue_list)
         if self.param is None:
-            objective = ['cross_entropy', 'lambdarank', 'regression', 'huber', 'mape']
             self.param = {
                 'objective': 'cross_entropy',
                 'learning_rate': 0.01,
@@ -242,25 +230,6 @@ class AgentBrain:
             return float(-1)
         return np.mean(self.average_mse)
 
-    def set_profile_test_data(self):
-        self.x_test = pd.DataFrame()
-        self.y_test = pd.DataFrame()
-        all_bids = AllBidsList(self.domain)
-        for i in range(0, all_bids.size() - 1, 1):
-            temp_bid = all_bids.get(i)
-            self.calculate_opponent_profile_for_test(temp_bid)
-
-    def calculate_opponent_profile_for_test(self, temp_bid):
-        if float(self.profile_parser_oppo.getUtility(temp_bid)) > float(0.6):
-            df_temp = pd.DataFrame(self.get_bid_value_array_for_data_frame_usage(temp_bid))
-            utility_of_bid = self.profile_parser_oppo.getUtility(temp_bid)
-
-            new = pd.DataFrame([utility_of_bid])
-            self.y_test = pd.concat([self.y_test, new])
-
-            df_temp = self.enumerate(df_temp)
-            self.x_test = pd.concat([self.x_test, df_temp])
-
     def model_feature_importance(self):
         df = pd.DataFrame({'Value': self.lgb_model.feature_importance(), 'Feature': self.X.columns})
         df = pd.DataFrame({'Value': self.lgb_model.feature_importance(), 'Feature': self.X.columns})
@@ -269,15 +238,11 @@ class AgentBrain:
         return parsed
 
     def util_add_agent_first_n_bid_to_machine_learning_with_low_utility(self, bid, ratio):
-        """self.train_machine_learning_model()
-        real_utility_of_opponent = self.profile_parser_oppo.getUtility(bid)
-        estimated_utility_before_adding_data = self.lgb_model.predict(self._bid_for_model_prediction_to_df(bid))"""
         bid_value_array = self.get_bid_value_array_for_data_frame_usage(bid)
         df = pd.DataFrame(bid_value_array)
         df = self.enumerate(df)
         self.X = pd.concat([self.X, df])
         util = float(float(0.2) + (float(ratio) * float(0.35)))
-        """Y tarafına öyle bir değişken atamalıyım ki adamın utilitisi olmalı (kendi utilitime göre olsa daha mantıklı olabilir gibi şimdilik)"""
         new = pd.DataFrame([util])
 
         self.Y = pd.concat([self.Y, new])
@@ -391,36 +356,3 @@ class AgentBrain:
                         self.goal_of_utility) - float(0.03) and float(self.call_model_lgb(bid)) < util_of_bid:
                     return bid
         return self.sorted_bids_agent[3]
-
-
-"""def evaluate_model_and_compare(self):
-    # Enumaration
-    if not (self.X.isnull().values.any() or self.Y.isnull().values.any()):
-        self.gradientBoostingRegressor.fit(self.X, self.Y)
-    else:
-        print("DF contains zero values")
-    y_test = pd.DataFrame()
-    x_test = pd.DataFrame()
-    total_utility = []
-    all_bids = AllBidsList(self.domain)
-    # Yarışmada kaldırılcak
-    for i in range(all_bids.size() - 1):
-        temp_bid = all_bids.get(i)
-        utility_of_bid_age = self.profile.getUtility(temp_bid)
-        # if Decimal(0.2) < utility_of_bid_age < Decimal(0.99):
-        df_temp = pd.DataFrame(self.get_bid_value_array_for_data_frame_usage(temp_bid))
-        x_test = pd.concat([x_test, df_temp])
-        utility_of_bid = self.profile_parser.getUtility(temp_bid)
-        total_utility.append(utility_of_bid_age + utility_of_bid)
-        new = pd.DataFrame([utility_of_bid])
-        y_test = pd.concat([y_test, new])
-
-    mean = np.mean(total_utility)
-    for issue in self.domain.getIssues():
-        x_test[issue] = x_test[issue].map(self.temEnumDict[issue])
-    if x_test.isnull().values.any():
-        print("Xtest : " + x_test.keys())
-
-    print(score)
-    return score
-"""

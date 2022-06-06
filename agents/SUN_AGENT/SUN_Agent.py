@@ -1,11 +1,8 @@
 import json
 import logging
-from random import randint
 from time import time
-from typing import cast, Dict, List, Union, AnyStr, Set
+from typing import cast
 
-import numpy as np
-import pandas as pd
 from geniusweb.actions.Accept import Accept
 from geniusweb.actions.Action import Action
 from geniusweb.actions.Offer import Offer
@@ -18,8 +15,6 @@ from geniusweb.inform.Settings import Settings
 from geniusweb.inform.YourTurn import YourTurn
 from geniusweb.issuevalue.Bid import Bid
 from geniusweb.issuevalue.Domain import Domain
-from geniusweb.issuevalue.Value import Value
-from geniusweb.issuevalue.ValueSet import ValueSet
 from geniusweb.party.Capabilities import Capabilities
 from geniusweb.party.DefaultParty import DefaultParty
 from geniusweb.profile.utilityspace.LinearAdditiveUtilitySpace import (
@@ -30,13 +25,9 @@ from geniusweb.profileconnection.ProfileConnectionFactory import (
 )
 from geniusweb.progress.ProgressTime import ProgressTime
 from geniusweb.references.Parameters import Parameters
-from tudelft.utilities.immutablelist.ImmutableList import ImmutableList
-from tudelft.utilities.immutablelist.Outer import Outer
 from tudelft_utilities_logging.ReportToLogger import ReportToLogger
 
 from agents.SUN_AGENT.utils.Sun_Agent_Brain import AgentBrain
-from agents.SUN_AGENT.utils.profile_parser import ProfileParser
-from timeit import default_timer as timer
 
 
 class SunAgent(DefaultParty):
@@ -46,7 +37,6 @@ class SunAgent(DefaultParty):
 
     def __init__(self):
         super().__init__()
-        self.last_trained_time = 0
         self.this_session_is_first_match_for_this_opponent = True
         self.logger: ReportToLogger = self.getReporter()
 
@@ -63,14 +53,12 @@ class SunAgent(DefaultParty):
 
         self.last_received_bid: Bid = None
 
-        self.profile_opponent_parser = ProfileParser()
-        self.profile_parser_opponent = ProfileParser()
-
-        self.agent_brain = AgentBrain(self.profile_opponent_parser,
-                                      self.profile_parser_opponent)
+        self.agent_brain = AgentBrain()
 
         self.storage_data = {}
         self.isFirstRound = True
+        self.last_trained_time = 0
+
         self.logger.log(logging.INFO, "party is initialized")
 
     def notifyChange(self, data: Inform):
@@ -84,7 +72,6 @@ class SunAgent(DefaultParty):
 
         # a Settings message is the first message that will be send to your
         # agent containing all the information about the negotiation session.
-        a = time()
         if isinstance(data, Settings):
             self.settings = cast(Settings, data)
             self.me = self.settings.getID()
@@ -104,17 +91,7 @@ class SunAgent(DefaultParty):
             if not self.sorted_bids:
                 self.sorted_bids = sorted(all_bids, key=lambda x: self.profile.getUtility(x),
                                           reverse=True)
-            """Agent Model"""
-            path = ""
-            if 'profileA' == self.profile.getName():
-                path = "domains/" + self.domain.getName() + "/profileB.json"
-            else:
-                path = "domains/" + self.domain.getName() + "/profileA.json"
-
-            self.profile_opponent_parser.parse(path)
-
-            self.agent_brain.fill_domain_and_profile(self.domain, self.profile,
-                                                     self.profile_opponent_parser)
+            self.agent_brain.fill_domain_and_profile(self.domain, self.profile)
 
             profile_connection.close()
 
@@ -148,11 +125,6 @@ class SunAgent(DefaultParty):
             super().terminate()
         else:
             self.logger.log(logging.WARNING, "Ignoring unknown info " + str(data))
-
-        b = time()
-
-        if (b - a > 1):
-            print("time " + str(b - a))
 
     def getCapabilities(self) -> Capabilities:
         """MUST BE IMPLEMENTED
@@ -196,12 +168,6 @@ class SunAgent(DefaultParty):
             bid = cast(Offer, action).getBid()
             progress_time = float(self.progress.get(time() * 1000))
             if bid not in self.agent_brain.offers_unique:
-                if self.profile.getUtility(bid) > self.agent_brain.profile_parser_oppo.getUtility(bid):
-                    print("I can win")
-                    print("my uti" + str(self.agent_brain.profile.getUtility(bid)))
-                    print("my oppo" + str(self.agent_brain.profile_parser_oppo.getUtility(bid)))
-                    print("my oppo" + str(self.agent_brain.call_model_lgb(bid)))
-
                 if len(self.agent_brain.offers_unique) <= 8 and progress_time < 0.81:
                     self.agent_brain.add_opponent_offer_to_self_x_and_self_y(bid, progress_time)
                     self.agent_brain.evaluate_data_according_to_lig_gbm(progress_time)
@@ -211,10 +177,6 @@ class SunAgent(DefaultParty):
                     self.last_trained_time = progress_time
 
             self.agent_brain.keep_opponent_offer_in_a_list(bid, progress_time)
-
-            # update opponent model with bid
-
-            self.profile_opponent_parser.getUtility(bid)
             # set bid as last received
             self.last_received_bid = bid
 
@@ -228,7 +190,7 @@ class SunAgent(DefaultParty):
             action = Accept(self.me, self.last_received_bid)
         else:
             # if not, find a bid to propose as counter offer
-            progress_time = self.progress.get(time() * 1000)
+            progress_time = float(self.progress.get(time() * 1000))
             bid = self.agent_brain.find_bid(progress_time)
             action = Offer(self.me, bid)
 
@@ -249,12 +211,9 @@ class SunAgent(DefaultParty):
         else:
             self.storage_data['domainName'] = [self.domain.getName()]
 
-        print("uniq" + str(len(self.agent_brain.offers_unique)))
         mae = self.agent_brain.get_average_of_mae()
-        print("Average mae" + str(mae))
         self.store_rmse_in_local_storage(mae)
 
-        print("I save data to storage")
         with open(f"{self.storage_dir}/{self.opponent_id}data.md", "w") as f:
             f.write(json.dumps(self.storage_data))
 
@@ -313,717 +272,3 @@ class SunAgent(DefaultParty):
             self.storage_data['mae'].append(rmse)
         else:
             self.storage_data['mae'] = [rmse]
-
-
-"""if __name__ == "__main__":
-    agent = SunAgent()
-    opponent = SunAgent()
-
-    domain = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
-    domain_path_1 = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
-
-    profileJsonOfOpponent = "/profileA.json"
-    profileJsonOfAgent = "/profileB.json"
-    json_path = ".json"
-
-    result = []
-    for i in range(0, 50):
-        stringNumber = str(i).zfill(2)
-        print(stringNumber)
-        domain_opponent = domain + stringNumber + profileJsonOfOpponent
-        domain_agent = domain + stringNumber + profileJsonOfAgent
-
-        profile_parser_agent = ProfileParser()
-        profile_parser_agent.parse(domain_agent)
-        profile_parser_opponent = ProfileParser()
-        profile_parser_opponent.parse(domain_opponent)
-
-        domain_path = domain_path_1 + stringNumber + "/domain" + stringNumber + json_path
-
-        with open(domain_path) as file:
-            domain_data = json.load(file)
-        name = "domain_name"
-        issue_values: Dict[str, ValueSet] = {}
-        for issue_dict in domain_data['issuesValues'].keys():
-            mp: List[ImmutableList[Value]] = []
-            for value in domain_data['issuesValues'][issue_dict]['values']:
-                mp.append(cast(Value, value))
-            issue_values[issue_dict] = cast(ImmutableList[Value], mp)
-            # issue_values[issue_dict] = cast(Value,issue_values[issue_dict]['values'])
-
-        domain_class = Domain(name, issue_values)
-        """
-"""issues: List[Set[str]] = list(domain_class.getIssues())
-values: List[ImmutableList[Value]] = [domain_class.getValues(issue) for issue in issues]
-all_bids: Outer = Outer[Value](values)"""
-"""
-        for issue_dict in issue_values:
-            values: List[ImmutableList[Value]] = [domain_class.getValues(issue) for issue in issue_values]
-            issue_values[issue_dict]: List[ImmutableList[Value]] = values
-        all_bids_list = AllBidsList(domain_class)
-
-        sorted_bids_agent = sorted(all_bids_list, key=lambda x: profile_parser_opponent.getUtility_for_testing(x),
-                                   reverse=True)
-        sorted_bids_opponent = sorted(all_bids_list, key=lambda x: profile_parser_agent.getUtility_for_testing(x),
-                                      reverse=True)
-
-        opponent_reg = GradientBoostingRegressorModel(profile_parser_opponent)
-        agent_reg = GradientBoostingRegressorModel(profile_parser_agent)
-
-        opponent_reg.add_domain_and_profile(domain_class, profile_parser_opponent)
-        agent_reg.add_domain_and_profile(domain_class, profile_parser_agent)
-
-        bid_list_agent = []
-        bid_number_that_random = 10
-        for i in range(1, bid_number_that_random):
-            bid_index = randint(0, int(len(sorted_bids_agent) * 0.001))
-            bid = sorted_bids_agent[bid_index]
-            bid_list_agent.append(bid)
-            agent_reg.add_opponent_offer_to_x(bid, 0.1)
-
-        bid_list_opponent = []
-
-        for i in range(1, bid_number_that_random):
-            bid_index = randint(0, int(len(sorted_bids_opponent) * 0.001))
-            bid = sorted_bids_opponent[bid_index]
-            bid_list_opponent.append(bid)
-            opponent_reg.add_opponent_offer_to_x(bid, 0.1)
-
-        for i in range(20):
-            param = {
-                'objective': 'regression',
-                'learning_rate': 0.05,
-                'force_row_wise': True,
-                'feature_fraction': 1,
-                'max_depth': i,
-                'num_leaves': (2 ** i) / 2,
-                'boosting': 'gbdt',
-                'min_data': 1,
-                'verbose': -1
-            }
-
-            agent_reg.param = param
-            opponent_reg.param = param
-
-            mae_agent = agent_reg.evaluate_data_according_to_lig_gbm()
-            mae_opponent = agent_reg.evaluate_data_according_to_lig_gbm()
-            dictionary = {'forEach': param, 'mae_agent': mae_agent, 'mae_opponent': mae_opponent
-                , 'profile.agent': domain_agent,
-                          'profile.oppo': domain_opponent,
-                          'taken_random_bid_number_from_all_bid_list': bid_number_that_random}
-
-            print(dictionary)
-
-            result.append(dictionary)
-
-    with open(f"data.md", "w") as f:
-        f.write(json.dumps(result))
-""""""
-if __name__ == "__main__":
-    agent = SunAgent()
-    opponent = SunAgent()
-
-    domain = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
-    domain_path_1 = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
-
-    profileJsonOfOpponent = "/profileA.json"
-    profileJsonOfAgent = "/profileB.json"
-    json_path = ".json"
-
-    result = []
-    param_result = []
-    for i in range(10):
-        for k in range(2, 50, 5):
-            param = {
-                'objective': 'regression',
-                'learning_rate': 0.05,
-                'force_row_wise': True,
-                'feature_fraction': 1,
-                'max_depth': i,
-                'num_leaves': k,
-                'boosting': 'gbdt',
-                'min_data': 1,
-                'verbose': -1
-            }
-            average_mae_agent = []
-            average_mae_oppo = []
-
-            for j in range(10, 50, 10):
-                bid_number_that_random = j
-
-                for i in range(0, 50):
-                    stringNumber = str(i).zfill(2)
-                    print(stringNumber)
-                    domain_opponent = domain + stringNumber + profileJsonOfOpponent
-                    domain_agent = domain + stringNumber + profileJsonOfAgent
-
-                    profile_parser_agent = ProfileParser()
-                    profile_parser_agent.parse(domain_agent)
-                    profile_parser_opponent = ProfileParser()
-                    profile_parser_opponent.parse(domain_opponent)
-
-                    domain_path = domain_path_1 + stringNumber + "/domain" + stringNumber + json_path
-
-                    with open(domain_path) as file:
-                        domain_data = json.load(file)
-                    name = "domain_name"
-                    issue_values: Dict[str, ValueSet] = {}
-                    for issue_dict in domain_data['issuesValues'].keys():
-                        mp: List[ImmutableList[Value]] = []
-                        for value in domain_data['issuesValues'][issue_dict]['values']:
-                            mp.append(cast(Value, value))
-                        issue_values[issue_dict] = cast(ImmutableList[Value], mp)
-                        # issue_values[issue_dict] = cast(Value,issue_values[issue_dict]['values'])
-
-                    domain_class = Domain(name, issue_values)
-                    """"""issues: List[Set[str]] = list(domain_class.getIssues())
-                    values: List[ImmutableList[Value]] = [domain_class.getValues(issue) for issue in issues]
-                    all_bids: Outer = Outer[Value](values)""""""
-                    for issue_dict in issue_values:
-                        values: List[ImmutableList[Value]] = [domain_class.getValues(issue) for issue in issue_values]
-                        issue_values[issue_dict]: List[ImmutableList[Value]] = values
-                    all_bids_list = AllBidsList(domain_class)
-
-                    sorted_bids_agent = sorted(all_bids_list,
-                                               key=lambda x: profile_parser_agent.getUtility_for_testing(x),
-                                               reverse=True)
-                    sorted_bids_opponent = sorted(all_bids_list,
-                                                  key=lambda x: profile_parser_opponent.getUtility_for_testing(x),
-                                                  reverse=True)
-
-                    opponent_reg = GradientBoostingRegressorModel(profile_parser_opponent)
-                    agent_reg = GradientBoostingRegressorModel(profile_parser_agent)
-
-                    opponent_reg.add_domain_and_profile(domain_class, profile_parser_opponent)
-                    agent_reg.add_domain_and_profile(domain_class, profile_parser_agent)
-
-                    agent_reg.param = param
-                    opponent_reg.param = param
-
-                    bid_list_agent = []
-                    for i in range(1, bid_number_that_random):
-                        if len(sorted_bids_agent) > 5000:
-                            bid_index = randint(0, int(50))
-                            bid = sorted_bids_agent[bid_index]
-                            bid_list_agent.append(bid)
-                            agent_reg.add_opponent_offer_to_x(bid, 0.1)
-                        elif len(sorted_bids_agent) > 1000:
-                            bid_index = randint(0, int(20))
-                            bid = sorted_bids_agent[bid_index]
-                            bid_list_agent.append(bid)
-                            agent_reg.add_opponent_offer_to_x(bid, 0.1)
-                        elif len(sorted_bids_agent) > 20:
-                            bid_index = randint(0, int(10))
-                            bid = sorted_bids_agent[bid_index]
-                            bid_list_agent.append(bid)
-                            agent_reg.add_opponent_offer_to_x(bid, 0.1)
-                        else:
-                            bid_index = randint(0, int(5))
-                            bid = sorted_bids_agent[bid_index]
-                            bid_list_agent.append(bid)
-                            agent_reg.add_opponent_offer_to_x(bid, 0.1)
-                    bid_list_opponent = []
-                    for i in range(1, bid_number_that_random):
-                        if len(sorted_bids_agent) > 5000:
-                            bid_index = randint(0, int(50))
-                            bid = sorted_bids_opponent[bid_index]
-                            bid_list_agent.append(bid)
-                            opponent_reg.add_opponent_offer_to_x(bid, 0.1)
-                        elif len(sorted_bids_agent) > 1000:
-                            bid_index = randint(0, int(20))
-                            bid = sorted_bids_opponent[bid_index]
-                            bid_list_agent.append(bid)
-                            opponent_reg.add_opponent_offer_to_x(bid, 0.1)
-                        elif len(sorted_bids_agent) > 20:
-                            bid_index = randint(0, int(10))
-                            bid = sorted_bids_opponent[bid_index]
-                            bid_list_agent.append(bid)
-                            opponent_reg.add_opponent_offer_to_x(bid, 0.1)
-                        else:
-                            bid_index = randint(0, int(1))
-                            bid = sorted_bids_opponent[bid_index]
-                            bid_list_agent.append(bid)
-                            opponent_reg.add_opponent_offer_to_x(bid, 0.1)
-
-                    agent_reg.param = param
-                    opponent_reg.param = param
-
-                    mae_agent = agent_reg.evaluate_data_according_to_lig_gbm()
-                    mae_opponent = opponent_reg.evaluate_data_according_to_lig_gbm()
-
-                    average_mae_agent.append(mae_agent)
-                    average_mae_oppo.append(mae_opponent)
-                    dictionary = {'forEach': param, 'mae_agent': mae_agent, 'mae_opponent': mae_opponent
-                        , 'profile.agent': domain_agent,
-                                  'profile.oppo': domain_opponent,
-                                  'taken_random_bid_number_from_all_bid_list': bid_number_that_random}
-
-                    print(dictionary)
-
-                    result.append(dictionary)
-
-                print("Average result for each parameter: ")
-                print(param)
-                avg_mea_agent_for_param = np.mean(average_mae_agent)
-                avg_mea_oppo_for_param = np.mean(average_mae_oppo)
-                dictionary2 = {'param': param, 'average_mae_agent': avg_mea_agent_for_param,
-                               'average_mae_oppo': avg_mea_oppo_for_param}
-                param_result.append(dictionary2)
-
-    with open(f"result1.md", "w") as f:
-        f.write(json.dumps(result))
-    with open(f"param_result_1.md", "w") as f:
-        f.write(json.dumps(param_result))
-"""
-
-
-def deep_analysis_for_machine_learning():
-    agent = SunAgent()
-    opponent = SunAgent()
-    domain = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
-    domain_path_1 = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
-    profileJsonOfOpponent = "/profileA.json"
-    profileJsonOfAgent = "/profileB.json"
-    json_path = ".json"
-    result = []
-    param_result = []
-    objective = ['cross_entropy', 'regression']
-    for objective in objective:
-        param = {
-            'objective': objective,
-            'learning_rate': 0.05,
-            'force_row_wise': True,
-            'feature_fraction': 1,
-            'max_depth': 2,
-            'num_leaves': 4,
-            'boosting': 'gbdt',
-            'min_data': 1,
-            'verbose': -1
-        }
-        average_mae_agent = []
-        average_mae_oppo = []
-
-        for j in [4, 8, 12]:
-            bid_number_that_random = j
-
-            for k in range(0, 50):
-                stringNumber = str(k).zfill(2)
-                print(stringNumber)
-                domain_opponent = domain + stringNumber + profileJsonOfOpponent
-                domain_agent = domain + stringNumber + profileJsonOfAgent
-
-                profile_parser_agent = ProfileParser()
-                profile_parser_agent.parse(domain_agent)
-                profile_parser_opponent = ProfileParser()
-                profile_parser_opponent.parse(domain_opponent)
-
-                domain_path = domain_path_1 + stringNumber + "/domain" + stringNumber + json_path
-
-                with open(domain_path) as file:
-                    domain_data = json.load(file)
-                name = "domain_name"
-                issue_values: Dict[str, ValueSet] = {}
-                for issue_dict in domain_data['issuesValues'].keys():
-                    mp: List[ImmutableList[Value]] = []
-                    for value in domain_data['issuesValues'][issue_dict]['values']:
-                        mp.append(cast(Value, value))
-                    issue_values[issue_dict] = cast(ImmutableList[Value], mp)
-                    # issue_values[issue_dict] = cast(Value,issue_values[issue_dict]['values'])
-
-                domain_class = Domain(name, issue_values)
-                """issues: List[Set[str]] = list(domain_class.getIssues())
-                values: List[ImmutableList[Value]] = [domain_class.getValues(issue) for issue in issues]
-                all_bids: Outer = Outer[Value](values)"""
-                for issue_dict in issue_values:
-                    values: List[ImmutableList[Value]] = [domain_class.getValues(issue) for issue in issue_values]
-                    issue_values[issue_dict]: List[ImmutableList[Value]] = values
-                all_bids_list = AllBidsList(domain_class)
-
-                sorted_bids_agent = sorted(all_bids_list,
-                                           key=lambda x: profile_parser_agent.getUtility_for_testing(x),
-                                           reverse=True)
-                sorted_bids_opponent = sorted(all_bids_list,
-                                              key=lambda x: profile_parser_opponent.getUtility_for_testing(x),
-                                              reverse=True)
-
-                opponent_reg = AgentBrain(profile_parser_opponent, profile_parser_agent)
-                agent_reg = AgentBrain(profile_parser_agent, profile_parser_opponent)
-
-                agent_reg.fill_domain_and_profile(domain_class, profile_parser_agent, profile_parser_opponent)
-
-                opponent_reg.fill_domain_and_profile(domain_class, profile_parser_opponent, profile_parser_agent)
-
-                agent_reg.param = param
-                opponent_reg.param = param
-
-                bid_list_agent = []
-                for m in range(1, bid_number_that_random):
-                    if len(sorted_bids_opponent) > 5000:
-                        bid_index = randint(0, int(50))
-                        bid = sorted_bids_opponent[bid_index]
-                        bid_list_agent.append(bid)
-                        agent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
-                    elif len(sorted_bids_opponent) > 1000:
-                        bid_index = randint(0, int(20))
-                        bid = sorted_bids_opponent[bid_index]
-                        bid_list_agent.append(bid)
-                        agent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
-                    elif len(sorted_bids_opponent) > 20:
-                        bid_index = randint(0, int(10))
-                        bid = sorted_bids_opponent[bid_index]
-                        bid_list_agent.append(bid)
-                        agent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
-                    else:
-                        bid_index = randint(0, int(5))
-                        bid = sorted_bids_opponent[bid_index]
-                        bid_list_agent.append(bid)
-                        agent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
-                bid_list_opponent = []
-                for m in range(1, bid_number_that_random):
-                    if len(sorted_bids_agent) > 5000:
-                        bid_index = randint(0, int(50))
-                        bid = sorted_bids_agent[bid_index]
-                        bid_list_opponent.append(bid)
-                        opponent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
-                    elif len(sorted_bids_agent) > 1000:
-                        bid_index = randint(0, int(20))
-                        bid = sorted_bids_agent[bid_index]
-                        bid_list_opponent.append(bid)
-                        opponent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
-                    elif len(sorted_bids_agent) > 20:
-                        bid_index = randint(0, int(10))
-                        bid = sorted_bids_agent[bid_index]
-                        bid_list_opponent.append(bid)
-                        opponent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
-                    else:
-                        bid_index = randint(0, int(1))
-                        bid = sorted_bids_opponent[bid_index]
-                        bid_list_opponent.append(bid)
-                        opponent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
-                start = timer()
-
-                agent_reg.param = param
-                opponent_reg.param = param
-                agent_reg.offers_unique = bid_list_agent
-                opponent_reg.offers_unique = bid_list_opponent
-                agent_reg.add_agent_first_n_bid_to_machine_learning_with_low_utility(sorted_bids_agent)
-                opponent_reg.add_agent_first_n_bid_to_machine_learning_with_low_utility(sorted_bids_opponent)
-
-                mae_agent = agent_reg.evaluate_data_according_to_lig_gbm(0.5)
-                mae_opponent = opponent_reg.evaluate_data_according_to_lig_gbm(0.5)
-                end = timer()
-                print(end - start)
-
-                average_mae_agent.append(float(mae_agent))
-                average_mae_oppo.append(float(mae_opponent))
-                dictionary = {'forEach': param, 'mae_agent': mae_agent, 'mae_opponent': mae_opponent,
-                              'profile.agent': domain_agent,
-                              'profile.oppo': domain_opponent,
-                              'taken_random_bid_number_from_all_bid_list': bid_number_that_random,
-                              'issue_weight': 2}
-                """
-                # Initialize an AutoML instance
-                automl = LGBMRegressor()
-                # Specify automl goal and constraint
-                settings = {
-                    "time_budget": 10,  # total running time in seconds
-                    "metric": 'r2',  # primary metrics for regression can be chosen from: ['mae','mse','r2']
-                    "estimator_list": ['lgbm'],  # list of ML learners; we tune lightgbm in this example
-                    "task": 'regression',  # task type
-                    "log_file_name": 'houses_experiment.log',  # flaml log file
-                    "seed": 7654321,  # random seed
-                }
-                automl.fit(agent_reg.X, agent_reg.Y, None, settings)
-                #automl.fit(X_train=agent_reg.X, y_train=agent_reg.Y, **settings)
-
-                ypred = automl.predict(agent_reg.y_test)
-                mae = mean_absolute_error(agent_reg.y_test, ypred)
-                print('Best hyperparmeter config:', automl.best_config)
-                print('Best r2 on validation data: {0:.4g}'.format(1 - automl.best_loss))
-                """
-                print(dictionary)
-
-                result.append(dictionary)
-
-            print("Average result for each parameter: ")
-            print(param)
-            avg_mea_agent_for_param = np.mean(average_mae_agent)
-            avg_mea_oppo_for_param = np.mean(average_mae_oppo)
-            dictionary2 = {'param': param, 'average_mae_agent': avg_mea_agent_for_param,
-                           'average_mae_oppo': avg_mea_oppo_for_param}
-            param_result.append(dictionary2)
-    with open(f"result1.md", "w") as f:
-        f.write(json.dumps(result))
-    with open(f"param_result_1.md", "w") as f:
-        f.write(json.dumps(param_result))
-
-
-def corrolation_analyses():
-    domain = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
-    domain_path_1 = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
-    profileJsonOfOpponent = "/profileA.json"
-    profileJsonOfAgent = "/profileB.json"
-    json_path = ".json"
-
-    domain_analysis_dict = pd.DataFrame()
-
-    value_dict = {}
-    for k in range(0, 50):
-        stringNumber = str(k).zfill(2)
-        print(stringNumber)
-        domain_opponent = domain + stringNumber + profileJsonOfOpponent
-        domain_agent = domain + stringNumber + profileJsonOfAgent
-
-        profile_parser_agent = ProfileParser()
-        profile_parser_agent.parse(domain_agent)
-        profile_parser_opponent = ProfileParser()
-        profile_parser_opponent.parse(domain_opponent)
-
-        domain_path = domain_path_1 + stringNumber + "/domain" + stringNumber + json_path
-
-        with open(domain_path) as file:
-            domain_data = json.load(file)
-        name = "domain_name"
-        issue_values: Dict[str, ValueSet] = {}
-        for issue_dict in domain_data['issuesValues'].keys():
-            mp: List[ImmutableList[Value]] = []
-            for value in domain_data['issuesValues'][issue_dict]['values']:
-                mp.append(cast(Value, value))
-            issue_values[issue_dict] = cast(ImmutableList[Value], mp)
-            # issue_values[issue_dict] = cast(Value,issue_values[issue_dict]['values'])
-
-        domain_class = Domain(name, issue_values)
-        """issues: List[Set[str]] = list(domain_class.getIssues())
-        values: List[ImmutableList[Value]] = [domain_class.getValues(issue) for issue in issues]
-        all_bids: Outer = Outer[Value](values)"""
-        for issue_dict in issue_values:
-            values: List[ImmutableList[Value]] = [domain_class.getValues(issue) for issue in issue_values]
-            issue_values[issue_dict]: List[ImmutableList[Value]] = values
-        all_bids_list = AllBidsList(domain_class)
-
-        sorted_bids_agent = sorted(all_bids_list,
-                                   key=lambda x: profile_parser_agent.getUtility_for_testing(x),
-                                   reverse=True)
-        sorted_bids_opponent = sorted(all_bids_list,
-                                      key=lambda x: profile_parser_opponent.getUtility_for_testing(x),
-                                      reverse=True)
-        """
-        opponent_reg = GradientBoostingRegressorModel(profile_parser_opponent, profile_parser_agent)
-        agent_reg = GradientBoostingRegressorModel(profile_parser_agent, profile_parser_opponent)
-
-        agent_reg.add_domain_and_profile(domain_class, profile_parser_agent, profile_parser_opponent)
-
-        opponent_reg.add_domain_and_profile(domain_class, profile_parser_opponent, profile_parser_agent)
-
-        agent_reg.param = param
-        opponent_reg.param = param
-        """
-        storage_data = None
-        try:
-            with open("result1gamma.md") as file:
-                storage_data = json.load(file)
-            print("I load data from storage")
-        except:
-            print("Error skip")
-        domian_spesific_data_list = []
-        average_mae_agent = []
-        average_mae_opponent = []
-        for row in storage_data:
-            if row['profile.agent'] == domain_agent:
-                domian_spesific_data_list.append(row)
-                average_mae_agent.append(float(row['mae_agent']))
-                average_mae_opponent.append(float(row['mae_opponent']))
-
-        average_list_agent = []
-        average_list_opponent = []
-        greater_than_095_agent = []
-        greater_than_090_agent = []
-        greater_than_085_agent = []
-        greater_than_095_opponent = []
-        greater_than_090_opponent = []
-        greater_than_085_opponent = []
-        for x in sorted_bids_agent:
-            util = profile_parser_agent.getUtility_for_testing(x)
-            average_list_agent.append(util)
-            if float(util) > float(0.95):
-                greater_than_095_agent.append(util)
-            elif float(util) > float(0.90):
-                greater_than_090_agent.append(util)
-            elif float(util) > float(0.85):
-                greater_than_085_agent.append(util)
-
-        for x in sorted_bids_opponent:
-            util = profile_parser_opponent.getUtility_for_testing(x)
-            average_list_opponent.append(util)
-            if float(util) > float(0.95):
-                greater_than_095_opponent.append(util)
-            elif float(util) > float(0.90):
-                greater_than_090_opponent.append(util)
-            elif float(util) > float(0.85):
-                greater_than_085_opponent.append(util)
-        percantage_of_greater_than95_agent = float(len(greater_than_095_agent)) / float(len(average_list_agent))
-        percantage_of_greater_than90_agent = float(len(greater_than_090_agent)) / float(len(average_list_agent))
-        percantage_of_greater_than85_agent = float(len(greater_than_085_agent)) / float(len(average_list_agent))
-        percantage_of_greater_than95_opponent = float(len(greater_than_095_opponent)) / float(
-            len(average_list_opponent))
-        percantage_of_greater_than90_opponent = float(len(greater_than_090_opponent)) / float(
-            len(average_list_opponent))
-        percantage_of_greater_than85_opponent = float(len(greater_than_085_opponent)) / float(
-            len(average_list_opponent))
-        average = np.mean(average_list_agent)
-        std = np.std(average_list_agent)
-        list_size_agent = len(average_list_agent)
-        list_size_oppo = len(average_list_opponent)
-        value_dict['average'] = [average]
-        value_dict['std'] = [std]
-        value_dict['percantage_of_greater_than85_agent'] = [percantage_of_greater_than85_agent]
-        value_dict['percantage_of_greater_than90_agent'] = [percantage_of_greater_than90_agent]
-        value_dict['percantage_of_greater_than95_agent'] = [percantage_of_greater_than95_agent]
-        value_dict['percantage_of_greater_than85_opponent'] = [percantage_of_greater_than85_opponent]
-        value_dict['percantage_of_greater_than90_opponent'] = [percantage_of_greater_than90_opponent]
-        value_dict['percantage_of_greater_than95_opponent'] = [percantage_of_greater_than95_opponent]
-        value_dict['list_size_oppo'] = [list_size_oppo]
-        value_dict['list_size_agent'] = [list_size_agent]
-        value_dict['domain_opponent'] = [domain_opponent]
-        value_dict['domain_agent'] = [domain_agent]
-        value_dict['domain_res_agent'] = [domain_agent]
-        value_dict['average_mae_agent'] = [np.mean(average_mae_agent)]
-        value_dict['average_mae_opponent'] = [np.mean(average_mae_opponent)]
-        df = pd.DataFrame.from_dict(value_dict)
-        domain_analysis_dict = pd.concat([domain_analysis_dict, df])
-
-    print("finished")
-    corr = domain_analysis_dict.corr(method='kendall')
-    print("corr")
-
-
-def domain_analyses():
-    domain = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
-    domain_path_1 = "C:/Users/nezih/Desktop/Anac2022/SunOfManAgent/domains/domain"
-    profileJsonOfOpponent = "/profileA.json"
-    profileJsonOfAgent = "/profileB.json"
-    json_path = ".json"
-
-    domain_analysis_dict = pd.DataFrame()
-
-    value_dict = {}
-    a = []
-    for k in range(0, 50):
-        stringNumber = str(k).zfill(2)
-        print(stringNumber)
-        domain_opponent = domain + stringNumber + profileJsonOfOpponent
-        domain_agent = domain + stringNumber + profileJsonOfAgent
-
-        profile_parser_agent = ProfileParser()
-        profile_parser_agent.parse(domain_agent)
-        profile_parser_opponent = ProfileParser()
-        profile_parser_opponent.parse(domain_opponent)
-
-        domain_path = domain_path_1 + stringNumber + "/domain" + stringNumber + json_path
-
-        with open(domain_path) as file:
-            domain_data = json.load(file)
-        name = "domain_name"
-        issue_values: Dict[str, ValueSet] = {}
-        for issue_dict in domain_data['issuesValues'].keys():
-            mp: List[ImmutableList[Value]] = []
-            for value in domain_data['issuesValues'][issue_dict]['values']:
-                mp.append(cast(Value, value))
-            issue_values[issue_dict] = cast(ImmutableList[Value], mp)
-            # issue_values[issue_dict] = cast(Value,issue_values[issue_dict]['values'])
-
-        domain_class = Domain(name, issue_values)
-        """issues: List[Set[str]] = list(domain_class.getIssues())
-        values: List[ImmutableList[Value]] = [domain_class.getValues(issue) for issue in issues]
-        all_bids: Outer = Outer[Value](values)"""
-        for issue_dict in issue_values:
-            values: List[ImmutableList[Value]] = [domain_class.getValues(issue) for issue in issue_values]
-            issue_values[issue_dict]: List[ImmutableList[Value]] = values
-        all_bids_list = AllBidsList(domain_class)
-
-        sorted_nash = sorted(all_bids_list,
-                             key=lambda x: profile_parser_agent.getUtility_for_testing(
-                                 x) + profile_parser_opponent.getUtility_for_testing(x),
-                             reverse=True)
-        b = profile_parser_agent.getUtility_for_testing(
-            sorted_nash[0]) + profile_parser_opponent.getUtility_for_testing(sorted_nash[0])
-        a.append(b)
-        value_dict['agent_opponnet_max_sum_util'] = float(b)
-        average_list_agent = []
-        average_list_opponent = []
-        greater_than_095_agent = []
-        greater_than_090_agent = []
-        greater_than_085_agent = []
-        greater_than_095_opponent = []
-        greater_than_090_opponent = []
-        greater_than_085_opponent = []
-        sorted_bids_agent = sorted(all_bids_list,
-                                   key=lambda x: profile_parser_agent.getUtility_for_testing(x),
-                                   reverse=True)
-        sorted_bids_opponent = sorted(all_bids_list,
-                                      key=lambda x: profile_parser_opponent.getUtility_for_testing(x),
-                                      reverse=True)
-        for x in sorted_bids_agent:
-            util = profile_parser_agent.getUtility_for_testing(x)
-            average_list_agent.append(util)
-            if float(util) > float(0.95):
-                greater_than_095_agent.append(util)
-            elif float(util) > float(0.90):
-                greater_than_090_agent.append(util)
-            elif float(util) > float(0.85):
-                greater_than_085_agent.append(util)
-
-        for x in sorted_bids_opponent:
-            util = profile_parser_opponent.getUtility_for_testing(x)
-            average_list_opponent.append(util)
-            if float(util) > float(0.95):
-                greater_than_095_opponent.append(util)
-            elif float(util) > float(0.90):
-                greater_than_090_opponent.append(util)
-            elif float(util) > float(0.85):
-                greater_than_085_opponent.append(util)
-        percantage_of_greater_than95_agent = float(len(greater_than_095_agent)) / float(len(average_list_agent))
-        percantage_of_greater_than90_agent = float(len(greater_than_090_agent)) / float(len(average_list_agent))
-        percantage_of_greater_than85_agent = float(len(greater_than_085_agent)) / float(len(average_list_agent))
-        percantage_of_greater_than95_opponent = float(len(greater_than_095_opponent)) / float(
-            len(average_list_opponent))
-        percantage_of_greater_than90_opponent = float(len(greater_than_090_opponent)) / float(
-            len(average_list_opponent))
-        percantage_of_greater_than85_opponent = float(len(greater_than_085_opponent)) / float(
-            len(average_list_opponent))
-        average = np.mean(average_list_agent)
-        std = np.std(average_list_agent)
-        list_size_agent = len(average_list_agent)
-        list_size_oppo = len(average_list_opponent)
-        value_dict['average'] = [average]
-        value_dict['std'] = [std]
-        value_dict['percantage_of_greater_than85_agent'] = [percantage_of_greater_than85_agent]
-        value_dict['percantage_of_greater_than90_agent'] = [percantage_of_greater_than90_agent]
-        value_dict['percantage_of_greater_than95_agent'] = [percantage_of_greater_than95_agent]
-        value_dict['percantage_of_greater_than85_opponent'] = [percantage_of_greater_than85_opponent]
-        value_dict['percantage_of_greater_than90_opponent'] = [percantage_of_greater_than90_opponent]
-        value_dict['percantage_of_greater_than95_opponent'] = [percantage_of_greater_than95_opponent]
-        value_dict['list_size_oppo'] = [list_size_oppo]
-        value_dict['list_size_agent'] = [list_size_agent]
-        value_dict['domain_opponent'] = [domain_opponent]
-        value_dict['domain_agent'] = [domain_agent]
-        value_dict['domain_res_agent'] = [domain_agent]
-
-        df = pd.DataFrame.from_dict(value_dict)
-        domain_analysis_dict = pd.concat([domain_analysis_dict, df])
-
-    print("mean: " + str(np.mean(a)) + "max + " + str(np.max(a)) + "min: " + str(np.min(a)))
-
-    corr = domain_analysis_dict.corr(method="kendall")
-    print("cor")
-
-
-"""
-if __name__ == "__main__":
-    if True:
-        deep_analysis_for_machine_learning()
-    if False:
-        corrolation_analyses()
-    if False:
-        domain_analyses()
-"""
