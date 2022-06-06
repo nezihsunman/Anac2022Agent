@@ -21,7 +21,7 @@ def main():
     domain = "domains/domain"
     profileJsonOfOpponent = "/profileA.json"
     profileJsonOfAgent = "/profileB.json"
-    for i in [15]:
+    for i in [3, 4, 5, 7]:
         stringNumber = str(i).zfill(2)
         print(stringNumber)
         settings = {
@@ -42,12 +42,14 @@ def main():
         session_results_trace, session_results_summary = run_session(settings)
         # plot trace to html file
         if not session_results_trace["error"]:
-            plot_trace(session_results_trace, RESULTS_DIR.joinpath("trace_plot.html"))
+            plot_trace(session_results_trace, RESULTS_DIR.joinpath("trace_plot" + str(stringNumber) + ".html"))
 
         # write results to file
-        with open(RESULTS_DIR.joinpath("session_results_trace.json"), "w", encoding="utf-8") as f:
+        with open(RESULTS_DIR.joinpath("session_results_trace+" + str(stringNumber) + ".json"), "w",
+                  encoding="utf-8") as f:
             f.write(json.dumps(session_results_trace, indent=2))
-        with open(RESULTS_DIR.joinpath("session_results_summary.json"), "w", encoding="utf-8") as f:
+        with open(RESULTS_DIR.joinpath("session_results_summary" + str(stringNumber) + ".json"), "w",
+                  encoding="utf-8") as f:
             f.write(json.dumps(session_results_summary, indent=2))
 
 

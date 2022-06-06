@@ -40,16 +40,9 @@ tournament_settings = {
         ["domains/domain21/profileA.json", "domains/domain21/profileB.json"],
         ["domains/domain22/profileA.json", "domains/domain22/profileB.json"],
         ["domains/domain23/profileA.json", "domains/domain23/profileB.json"],
-        ["domains/domain24/profileA.json", "domains/domain24/profileB.json"],
-        ["domains/domain25/profileA.json", "domains/domain25/profileB.json"],
-        ["domains/domain26/profileA.json", "domains/domain26/profileB.json"],
-        ["domains/domain27/profileA.json", "domains/domain27/profileB.json"],
+        ["domains/domain24/profileA.json", "domains/domain24/profileB.json"]
         ["domains/domain28/profileA.json", "domains/domain28/profileB.json"],
         ["domains/domain30/profileA.json", "domains/domain30/profileB.json"],
-        ["domains/domain37/profileA.json", "domains/domain37/profileB.json"],
-        ["domains/domain44/profileA.json", "domains/domain44/profileB.json"],
-        ["domains/domain45/profileA.json", "domains/domain45/profileB.json"],
-        ["domains/domain46/profileA.json", "domains/domain46/profileB.json"],
         ["domains/domain47/profileA.json", "domains/domain47/profileB.json"],
         ["domains/domain48/profileA.json", "domains/domain48/profileB.json"],
         ["domains/domain49/profileA.json", "domains/domain49/profileB.json"]
