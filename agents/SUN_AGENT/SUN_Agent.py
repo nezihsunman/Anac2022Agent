@@ -31,10 +31,6 @@ from agents.SUN_AGENT.utils.Sun_Agent_Brain import AgentBrain
 
 
 class SunAgent(DefaultParty):
-    """
-    Template of a Python geniusweb agent.
-    """
-
     def __init__(self):
         super().__init__()
         self.this_session_is_first_match_for_this_opponent = True
@@ -155,7 +151,7 @@ class SunAgent(DefaultParty):
         Returns:
             str: Agent description
         """
-        return "Template agent for the ANL 2022 competition"
+        return "SunAgent that empowered by LightGBM tries to find opponent weak side"
 
     def opponent_action(self, action):
         """Process an action that was received from the opponent.
