@@ -22,26 +22,40 @@ tournament_settings = {
             "parameters": {"storage_dir": "agent_storage/SunAgent"},
         },
         {
+            "class": "agents.CSE3210.agent26.agent26.Agent26",
+        },
+        {
             "class": "agents.CSE3210.agent64.agent64.Agent64",
+        },
+        {
+            "class": "agents.CSE3210.agent33.agent33.Agent33",
         }
     ],
     "profile_sets": [
         ["domains/domain04/profileA.json", "domains/domain04/profileB.json"],
         ["domains/domain05/profileA.json", "domains/domain05/profileB.json"],
-        ["domains/domain06/profileA.json", "domains/domain06/profileB.json"],
-        ["domains/domain07/profileA.json", "domains/domain07/profileB.json"],
-        ["domains/domain08/profileA.json", "domains/domain08/profileB.json"],
-        ["domains/domain09/profileA.json", "domains/domain09/profileB.json"],
-        ["domains/domain10/profileA.json", "domains/domain10/profileB.json"],
-        ["domains/domain11/profileA.json", "domains/domain11/profileB.json"],
-        ["domains/domain12/profileA.json", "domains/domain12/profileB.json"],
-        ["domains/domain13/profileA.json", "domains/domain13/profileB.json"],
-        ["domains/domain14/profileA.json", "domains/domain14/profileB.json"],
-        ["domains/domain15/profileA.json", "domains/domain15/profileB.json"],
-        ["domains/domain16/profileA.json", "domains/domain16/profileB.json"],
-        ["domains/domain17/profileA.json", "domains/domain17/profileB.json"],
+        ["domains/domain18/profileA.json", "domains/domain18/profileB.json"],
+        ["domains/domain19/profileA.json", "domains/domain19/profileB.json"],
+        ["domains/domain20/profileA.json", "domains/domain20/profileB.json"],
+        ["domains/domain21/profileA.json", "domains/domain21/profileB.json"],
+        ["domains/domain22/profileA.json", "domains/domain22/profileB.json"],
+        ["domains/domain23/profileA.json", "domains/domain23/profileB.json"],
+        ["domains/domain24/profileA.json", "domains/domain24/profileB.json"],
+        ["domains/domain25/profileA.json", "domains/domain25/profileB.json"],
+        ["domains/domain26/profileA.json", "domains/domain26/profileB.json"],
+        ["domains/domain27/profileA.json", "domains/domain27/profileB.json"],
+        ["domains/domain28/profileA.json", "domains/domain28/profileB.json"],
+        ["domains/domain30/profileA.json", "domains/domain30/profileB.json"],
+        ["domains/domain37/profileA.json", "domains/domain37/profileB.json"],
+        ["domains/domain44/profileA.json", "domains/domain44/profileB.json"],
+        ["domains/domain45/profileA.json", "domains/domain45/profileB.json"],
+        ["domains/domain46/profileA.json", "domains/domain46/profileB.json"],
+        ["domains/domain47/profileA.json", "domains/domain47/profileB.json"],
+        ["domains/domain48/profileA.json", "domains/domain48/profileB.json"],
+        ["domains/domain49/profileA.json", "domains/domain49/profileB.json"]
     ],
     "deadline_time_ms": 60000,
+    #"deadlinerounds":{"rounds":100,"durationms":999}
 }
 
 # run a session and obtain results in dictionaries

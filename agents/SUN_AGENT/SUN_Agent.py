@@ -189,12 +189,20 @@ class SunAgent(DefaultParty):
             bid = cast(Offer, action).getBid()
 
             if bid not in self.agent_brain.offers_unique:
+                # bid util
+                if self.profile.getUtility(bid) > self.agent_brain.profile_parser_oppo.getUtility(bid):
+                    print("I can win")
+                    print("my uti" + str(self.agent_brain.profile.getUtility(bid)))
+                    print("my oppo" + str(self.agent_brain.profile_parser_oppo.getUtility(bid)))
+                    print("my oppo" + str(self.agent_brain.call_model_lgb(bid)))
+
                 self.agent_brain.add_opponent_offer_to_self_x_and_self_y(bid,
                                                                          self.progress.get(time() * 1000))
+                if len(self.agent_brain.offers_unique) <= 16 and self.progress.get(time() * 1000) < 0.81:
+                    self.agent_brain.evaluate_data_according_to_lig_gbm(self.progress.get(time() * 1000))
             self.agent_brain.keep_opponent_offer_in_a_list(bid)
 
             # update opponent model with bid
-            self.agent_brain.evaluate_data_according_to_lig_gbm(self.progress.get(time() * 1000))
 
             self.profile_opponent_parser.getUtility(bid)
             # set bid as last received
@@ -226,6 +234,12 @@ class SunAgent(DefaultParty):
             self.storage_data['offerNumberUnique'].append(len(self.agent_brain.offers_unique))
         else:
             self.storage_data['offerNumberUnique'] = [len(self.agent_brain.offers_unique)]
+        if 'domainName' in self.storage_data.keys():
+            self.storage_data['domainName'].append(self.domain.getName())
+        else:
+            self.storage_data['domainName'] = [self.domain.getName()]
+
+        print("uniq" + str(len(self.agent_brain.offers_unique)))
         mae = self.agent_brain.get_average_of_mae()
         print("Average mae" + str(mae))
         self.store_rmse_in_local_storage(mae)
@@ -563,7 +577,7 @@ def deep_analysis_for_machine_learning():
     json_path = ".json"
     result = []
     param_result = []
-    objective = ['cross_entropy', 'lambdarank', 'regression', 'huber', 'mape']
+    objective = ['cross_entropy', 'regression']
     for objective in objective:
         param = {
             'objective': objective,
@@ -579,7 +593,7 @@ def deep_analysis_for_machine_learning():
         average_mae_agent = []
         average_mae_oppo = []
 
-        for j in range(20, 39, 10):
+        for j in [4, 8, 12]:
             bid_number_that_random = j
 
             for k in range(0, 50):
@@ -659,43 +673,44 @@ def deep_analysis_for_machine_learning():
                     if len(sorted_bids_agent) > 5000:
                         bid_index = randint(0, int(50))
                         bid = sorted_bids_agent[bid_index]
-                        bid_list_agent.append(bid)
+                        bid_list_opponent.append(bid)
                         opponent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
                     elif len(sorted_bids_agent) > 1000:
                         bid_index = randint(0, int(20))
                         bid = sorted_bids_agent[bid_index]
-                        bid_list_agent.append(bid)
+                        bid_list_opponent.append(bid)
                         opponent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
                     elif len(sorted_bids_agent) > 20:
                         bid_index = randint(0, int(10))
                         bid = sorted_bids_agent[bid_index]
-                        bid_list_agent.append(bid)
+                        bid_list_opponent.append(bid)
                         opponent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
                     else:
                         bid_index = randint(0, int(1))
                         bid = sorted_bids_opponent[bid_index]
-                        bid_list_agent.append(bid)
+                        bid_list_opponent.append(bid)
                         opponent_reg.add_opponent_offer_to_self_x_and_self_y(bid, 0.1)
                 start = timer()
 
                 agent_reg.param = param
                 opponent_reg.param = param
-
+                agent_reg.offers_unique = bid_list_agent
+                opponent_reg.offers_unique = bid_list_opponent
                 agent_reg.add_agent_first_n_bid_to_machine_learning_with_low_utility(sorted_bids_agent)
                 opponent_reg.add_agent_first_n_bid_to_machine_learning_with_low_utility(sorted_bids_opponent)
 
-                mae_agent = agent_reg.evaluate_data_according_to_lig_gbm()
-                mae_opponent = opponent_reg.evaluate_data_according_to_lig_gbm()
+                mae_agent = agent_reg.evaluate_data_according_to_lig_gbm(0.5)
+                mae_opponent = opponent_reg.evaluate_data_according_to_lig_gbm(0.5)
                 end = timer()
                 print(end - start)
 
-                average_mae_agent.append(mae_agent)
-                average_mae_oppo.append(mae_opponent)
+                average_mae_agent.append(float(mae_agent))
+                average_mae_oppo.append(float(mae_opponent))
                 dictionary = {'forEach': param, 'mae_agent': mae_agent, 'mae_opponent': mae_opponent,
                               'profile.agent': domain_agent,
                               'profile.oppo': domain_opponent,
                               'taken_random_bid_number_from_all_bid_list': bid_number_that_random,
-                              'issue_weight': agent_reg.model_feature_importance()}
+                              'issue_weight': 2}
                 """
                 # Initialize an AutoML instance
                 automl = LGBMRegressor()
@@ -995,10 +1010,10 @@ def domain_analyses():
 
 """
 if __name__ == "__main__":
-    if False:
+    if True:
         deep_analysis_for_machine_learning()
     if False:
         corrolation_analyses()
-    if True:
+    if False:
         domain_analyses()
 """

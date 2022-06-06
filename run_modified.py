@@ -21,19 +21,18 @@ def main():
     domain = "domains/domain"
     profileJsonOfOpponent = "/profileA.json"
     profileJsonOfAgent = "/profileB.json"
-    for i in range(15, 16):
+    for i in [4]:
         stringNumber = str(i).zfill(2)
         print(stringNumber)
         settings = {
             "agents": [
                 {
-                    "class": "agents.boulware_agent.boulware_agent.BoulwareAgent",
+                    "class": "agents.SUN_AGENT.SUN_Agent.SunAgent",
+                    "parameters": {"storage_dir": "agent_storage/SunAgent"},
                 },
                 {
-                    "class": "agents.SUN_AGENT.SUN_Agent.SunAgent",
-                    "parameters": {"storage_dir": "agent_storage/SunAgent",
-                                   "profiles_domain_of_opponent": domain + stringNumber + profileJsonOfOpponent},
-                },
+                    "class": "agents.CSE3210.agent26.agent26.Agent26",
+                }
             ],
             "profiles": [domain + stringNumber + profileJsonOfOpponent, domain + stringNumber + profileJsonOfAgent],
             "deadline_time_ms": 60000,
