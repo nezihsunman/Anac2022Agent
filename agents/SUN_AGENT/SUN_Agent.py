@@ -46,6 +46,7 @@ class SunAgent(DefaultParty):
 
     def __init__(self):
         super().__init__()
+        self.last_trained_time = 0
         self.this_session_is_first_match_for_this_opponent = True
         self.logger: ReportToLogger = self.getReporter()
 
@@ -83,6 +84,7 @@ class SunAgent(DefaultParty):
 
         # a Settings message is the first message that will be send to your
         # agent containing all the information about the negotiation session.
+        a = time()
         if isinstance(data, Settings):
             self.settings = cast(Settings, data)
             self.me = self.settings.getID()
@@ -147,6 +149,11 @@ class SunAgent(DefaultParty):
         else:
             self.logger.log(logging.WARNING, "Ignoring unknown info " + str(data))
 
+        b = time()
+
+        if (b - a > 1):
+            print("time " + str(b - a))
+
     def getCapabilities(self) -> Capabilities:
         """MUST BE IMPLEMENTED
         Method to indicate to the protocol what the capabilities of this agent are.
@@ -187,20 +194,23 @@ class SunAgent(DefaultParty):
         # if it is an offer, set the last received bid
         if isinstance(action, Offer):
             bid = cast(Offer, action).getBid()
-
+            progress_time = float(self.progress.get(time() * 1000))
             if bid not in self.agent_brain.offers_unique:
-                # bid util
                 if self.profile.getUtility(bid) > self.agent_brain.profile_parser_oppo.getUtility(bid):
                     print("I can win")
                     print("my uti" + str(self.agent_brain.profile.getUtility(bid)))
                     print("my oppo" + str(self.agent_brain.profile_parser_oppo.getUtility(bid)))
                     print("my oppo" + str(self.agent_brain.call_model_lgb(bid)))
 
-                self.agent_brain.add_opponent_offer_to_self_x_and_self_y(bid,
-                                                                         self.progress.get(time() * 1000))
-                if len(self.agent_brain.offers_unique) <= 16 and self.progress.get(time() * 1000) < 0.81:
-                    self.agent_brain.evaluate_data_according_to_lig_gbm(self.progress.get(time() * 1000))
-            self.agent_brain.keep_opponent_offer_in_a_list(bid)
+                if len(self.agent_brain.offers_unique) <= 8 and progress_time < 0.81:
+                    self.agent_brain.add_opponent_offer_to_self_x_and_self_y(bid, progress_time)
+                    self.agent_brain.evaluate_data_according_to_lig_gbm(progress_time)
+                    self.last_trained_time = progress_time
+                elif self.last_trained_time + 0.1 > progress_time and self.agent_brain.lgb_model is not None:
+                    self.agent_brain.evaluate_opponent_utility_for_all_my_important_bid(progress_time)
+                    self.last_trained_time = progress_time
+
+            self.agent_brain.keep_opponent_offer_in_a_list(bid, progress_time)
 
             # update opponent model with bid
 

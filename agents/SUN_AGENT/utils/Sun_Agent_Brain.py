@@ -45,6 +45,7 @@ class AgentBrain:
 
         self.offers = []
         self.offers_unique = []
+        self.offers_unique_sorted = None
 
         self.number_of_bid_greater_than95 = 0
         self.percentage_of_greater_than95 = 0
@@ -57,14 +58,25 @@ class AgentBrain:
 
     @staticmethod
     def get_goal_of_negoation_utility(x):
-        return (float(-57.57067183) * float(x) * float(x) + float(x) * float(7.50261378) + float(1.59499339)) / float(2)
+        if 0 <= x <= 0.05:
+            a = float(-57.57067183) * float(x) * float(x)
+            b = float(x) * float(7.50261378)
+            c = float(1.59499339)
+            d = a + b + c
+            return float(d / 2)
+        elif x > 0.05:
+            return float(0.94)
+        return float(0.80)
 
-    def keep_opponent_offer_in_a_list(self, bid: Bid):
+    def keep_opponent_offer_in_a_list(self, bid: Bid, progress_time: float):
         # keep track of all bids received
         self.offers.append(bid)
 
         if bid not in self.offers_unique:
             self.offers_unique.append(bid)
+            if progress_time >= 0.9:
+                self.offers_unique_sorted = sorted(self.offers_unique, key=lambda x: self.profile.getUtility(x),
+                                                   reverse=True)
 
     def add_opponent_offer_to_self_x_and_self_y(self, bid, progress_time):
         bid_value_array = self.get_bid_value_array_for_data_frame_usage(bid)
@@ -106,9 +118,10 @@ class AgentBrain:
         numb_95 = 0
         numb_85 = 0
         for i in self.sorted_bids_agent:
-            if self.profile.getUtility(i) > float(0.95):
+            utility = float(self.profile.getUtility(i))
+            if utility > float(0.95):
                 numb_95 = numb_95 + 1
-            if self.profile.getUtility(i) > float(0.85):
+            if utility > float(0.85):
                 numb_85 = numb_85 + 1
             else:
                 break
@@ -120,7 +133,8 @@ class AgentBrain:
         self.percentage_of_greater_than85 = float(self.number_of_bid_greater_than85) / float(
             len(self.sorted_bids_agent))
 
-        self.goal_of_utility = self.get_goal_of_negoation_utility(self.percentage_of_greater_than85) + float(0.01)
+        self.goal_of_utility = self.get_goal_of_negoation_utility(float(self.percentage_of_greater_than85)) + float(
+            0.01)
         print("goal " + str(self.goal_of_utility))
         numb_goal_util = 0
         self.sorted_bids_agent_df = pd.DataFrame()
@@ -147,22 +161,13 @@ class AgentBrain:
         self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent = []
         util_of_opponent = self.lgb_model.predict(self.sorted_bids_agent_that_greater_than_065_df)
 
-        for index, i in enumerate(self.sorted_bids_agent_that_greater_than_goal_of_utility):
+        for index, i in enumerate(self.sorted_bids_agent_that_greater_than_065):
             util = float(self.profile.getUtility(i))
             if float(self.reservationBid_utility) < util \
-                    and (((float(0.95) - (
-                    (float(0.95) - (self.goal_of_utility - float(0.1))) * float(progress_time))) < util)
-                         and float(0.40) < util_of_opponent[index] < util - float(0.05)):
+                    and (((float(0.93) - (
+                    (float(0.95) - (self.goal_of_utility - float(0.18))) * float(progress_time))) < util)
+                         and float(0.40) < util_of_opponent[index] < util - float(0.15)):
                 self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent.append(i)
-
-        if len(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent) == 0 and 0.60 < progress_time < 0.72:
-            for index, i in enumerate(self.sorted_bids_agent_that_greater_than_065):
-                util = float(self.profile.getUtility(i))
-                if float(self.reservationBid_utility) < util \
-                        and util_of_opponent[index] < util - float(0.1):
-                    self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent.append(i)
-
-        print("leng" + str(len(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent)))
 
     def evaluate_data_according_to_lig_gbm(self, progress_time):
         length = len(self.offers_unique)
@@ -205,9 +210,9 @@ class AgentBrain:
     def call_model_lgb(self, bid):
         if self.lgb_model:
             prediction = self.lgb_model.predict(self._bid_for_model_prediction_to_df(bid))
-            return prediction[0]
+            return float(prediction[0])
         else:
-            return 1
+            return float(1)
 
     def get_bid_value_array_for_data_frame_usage(self, bid):
         bid_value_array = {}
@@ -279,17 +284,6 @@ class AgentBrain:
 
     def add_agent_first_n_bid_to_machine_learning_with_low_utility(self, sorted_bids_agent):
 
-        """bid_number = 4
-                if len(sorted_bids_agent) > 10000:
-                    bid_number = 30
-                elif len(sorted_bids_agent) > 5000:
-                    bid_number = 25
-                elif len(sorted_bids_agent) > 4000:
-                    bid_number = 15
-                elif len(sorted_bids_agent) > 2000:
-                    bid_number = 7
-                elif len(sorted_bids_agent) > 1000:
-                    bid_number = 5"""
         if self.number_of_goal_of_utility > 150:
             bid_number = 40
             print("considered bid number " + str(bid_number) + "goal " + str(self.number_of_goal_of_utility))
@@ -325,24 +319,31 @@ class AgentBrain:
                                                                                  float(float(i) / float(bid_number)))
 
     def is_acceptable(self, bid: Bid, progress):
-        if self.profile.getUtility(bid) > 0.94:
+        util = float(self.profile.getUtility(bid))
+        if util >= 0.94:
             return True
-        elif 0.94 > progress > 0.80 and self.profile.getUtility(bid) > self.goal_of_utility and self.profile.getUtility(
-                bid) - float(0.15) > float(self.call_model_lgb(bid)):
+        elif util >= 0.92 and 0.78 > float(self.call_model_lgb(bid)):
             return True
-        elif 0.97 > progress > 0.94 and self.profile.getUtility(bid) > self.goal_of_utility - float(0.15):
+        elif 0.94 > float(progress) > 0.85 and util > self.goal_of_utility - float(0.28) and util - float(0.20) > float(
+                self.call_model_lgb(bid)):
+            return True
+        elif 0.97 > float(progress) > 0.93 and util > self.goal_of_utility and util - float(0.20) > float(
+                self.call_model_lgb(bid)):
+            return True
+        elif 1 >= float(progress) > 0.98 and util - float(0.23) > float(self.call_model_lgb(bid)):
             return True
         return False
 
     def find_bid(self, progress_time):
         progress_time = float(progress_time)
-        if 0 < progress_time < 0.9 and self.lgb_model is not None and len(
+        if 0 < progress_time < 0.95 and self.lgb_model is not None and len(
                 self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent) >= 1:
             index = random.randint(0,
                                    len(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent) - 1)
             if float(self.reservationBid_utility) < float(
                     self.profile.getUtility(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent[index])):
                 return self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent[index]
+
         elif progress_time < 0.4:
             if self.number_of_bid_greater_than95 >= 4:
                 index = random.randint(3, self.number_of_bid_greater_than95)
@@ -382,14 +383,13 @@ class AgentBrain:
                 index = random.randint(1, self.number_of_goal_of_utility)
                 if float(self.reservationBid_utility) < float(self.profile.getUtility(self.sorted_bids_agent[index])):
                     return self.sorted_bids_agent[index]
-        elif progress_time <= 0.998:
-            sorted_opponent_bid_acc_to_agent = sorted(self.offers_unique, key=lambda x: self.profile.getUtility(x),
-                                                      reverse=True)
-            bid = sorted_opponent_bid_acc_to_agent[0]
-            util_of_bid = self.profile.getUtility(bid)
-            if float(self.reservationBid_utility) < float(util_of_bid) and float(util_of_bid) >= float(
-                    self.goal_of_utility) - float(0.03) and self.call_model_lgb(bid) < util_of_bid:
-                return bid
+        elif 0.91 <= progress_time <= 0.999:
+            if self.offers_unique_sorted is not None and not len(self.offers_unique_sorted) == 0:
+                bid = self.offers_unique_sorted[0]
+                util_of_bid = float(self.profile.getUtility(bid))
+                if float(self.reservationBid_utility) < float(util_of_bid) and float(util_of_bid) >= float(
+                        self.goal_of_utility) - float(0.03) and float(self.call_model_lgb(bid)) < util_of_bid:
+                    return bid
         return self.sorted_bids_agent[3]
 
 
