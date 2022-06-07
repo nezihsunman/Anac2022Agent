@@ -18,32 +18,14 @@ if not RESULTS_DIR.exists():
 tournament_settings = {
     "agents": [
         {
-            "class": "agents.Pinar_Agent.SUN_Agent.SunAgent",
-            "parameters": {"storage_dir": "agent_storage/SunAgent"},
+            "class": "agents.Pinar_Agent.Pinar_Agent.Pinar_Agent",
+            "parameters": {"storage_dir": "agent_storage/Pinar_Agent"},
         },
         {
             "class": "agents.CSE3210.agent26.agent26.Agent26",
         },
         {
-            "class": "agents.CSE3210.agent64.agent64.Agent64",
-        },
-        {
-            "class": "agents.CSE3210.agent33.agent33.Agent33",
-        },
-        {
-            "class": "agents.CSE3210.agent14.agent14.Agent14",
-        },
-        {
-            "class": "agents.CSE3210.agent18.agent18.Agent18",
-        },
-        {
             "class": "agents.CSE3210.agent19.agent19.Agent19",
-        },
-        {
-            "class": "agents.CSE3210.agent22.agent22.Agent22",
-        },
-        {
-            "class": "agents.CSE3210.agent24.agent24.Agent24",
         },
         {
             "class": "agents.CSE3210.agent25.agent25.Agent25",
@@ -67,7 +49,7 @@ tournament_settings = {
         ["domains/domain48/profileA.json", "domains/domain48/profileB.json"],
         ["domains/domain49/profileA.json", "domains/domain49/profileB.json"]
     ],
-    "deadline_time_ms": 30000,
+    "deadline_time_ms": 60000,
     # "deadlinerounds":{"rounds":100,"durationms":999}
 }
 
