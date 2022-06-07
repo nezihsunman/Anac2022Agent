@@ -29,26 +29,46 @@ tournament_settings = {
         },
         {
             "class": "agents.CSE3210.agent33.agent33.Agent33",
+        },
+        {
+            "class": "agents.CSE3210.agent14.agent14.Agent14",
+        },
+        {
+            "class": "agents.CSE3210.agent18.agent18.Agent18",
+        },
+        {
+            "class": "agents.CSE3210.agent19.agent19.Agent19",
+        },
+        {
+            "class": "agents.CSE3210.agent22.agent22.Agent22",
+        },
+        {
+            "class": "agents.CSE3210.agent24.agent24.Agent24",
+        },
+        {
+            "class": "agents.CSE3210.agent25.agent25.Agent25",
         }
     ],
     "profile_sets": [
+        ["domains/domain03/profileA.json", "domains/domain03/profileB.json"],
         ["domains/domain04/profileA.json", "domains/domain04/profileB.json"],
         ["domains/domain05/profileA.json", "domains/domain05/profileB.json"],
+        ["domains/domain07/profileA.json", "domains/domain07/profileB.json"],
         ["domains/domain18/profileA.json", "domains/domain18/profileB.json"],
         ["domains/domain19/profileA.json", "domains/domain19/profileB.json"],
         ["domains/domain20/profileA.json", "domains/domain20/profileB.json"],
         ["domains/domain21/profileA.json", "domains/domain21/profileB.json"],
         ["domains/domain22/profileA.json", "domains/domain22/profileB.json"],
         ["domains/domain23/profileA.json", "domains/domain23/profileB.json"],
-        ["domains/domain24/profileA.json", "domains/domain24/profileB.json"]
+        ["domains/domain24/profileA.json", "domains/domain24/profileB.json"],
         ["domains/domain28/profileA.json", "domains/domain28/profileB.json"],
         ["domains/domain30/profileA.json", "domains/domain30/profileB.json"],
         ["domains/domain47/profileA.json", "domains/domain47/profileB.json"],
         ["domains/domain48/profileA.json", "domains/domain48/profileB.json"],
         ["domains/domain49/profileA.json", "domains/domain49/profileB.json"]
     ],
-    "deadline_time_ms": 20000,
-    #"deadlinerounds":{"rounds":100,"durationms":999}
+    "deadline_time_ms": 30000,
+    # "deadlinerounds":{"rounds":100,"durationms":999}
 }
 
 # run a session and obtain results in dictionaries

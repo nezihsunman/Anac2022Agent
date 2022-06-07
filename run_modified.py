@@ -53,5 +53,30 @@ def main():
             f.write(json.dumps(session_results_summary, indent=2))
 
 
+def analysis():
+    with open("results" + "/20220607-013859" + "/tournament_results.json") as file:
+        temp = json.load(file)
+    with open("results" + "/20220607-013859" + "/tournament_steps.json") as file:
+        temp2 = json.load(file)
+    t = 0
+    for i in range(0, len(temp)):
+        a = temp[i]
+        b = temp2[i]
+        strr = 'agent_' + str(t + 1)
+        str2 = 'agent_' + str(t + 2)
+        if a[strr] == 'SunAgent':
+            if a['result'] == 'failed':
+                print(b['profiles'])
+            elif a['result'] == 'ERROR':
+                print("error " + str(b['profiles']))
+        elif a[str2] == 'SunAgent':
+            if a['result'] == 'failed':
+                print(b['profiles'])
+            elif a['result'] == 'ERROR':
+                print("error " + str(b['profiles']))
+
+        t = t + 2
+
+
 if __name__ == "__main__":
     main()
