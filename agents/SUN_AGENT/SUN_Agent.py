@@ -33,7 +33,6 @@ from agents.SUN_AGENT.utils.Sun_Agent_Brain import AgentBrain
 class SunAgent(DefaultParty):
     def __init__(self):
         super().__init__()
-        self.this_session_is_first_match_for_this_opponent = True
         self.logger: ReportToLogger = self.getReporter()
 
         self.domain: Domain = None
@@ -198,16 +197,25 @@ class SunAgent(DefaultParty):
         for learning capabilities. Note that no extensive calculations can be done within this method.
         Taking too much time might result in your agent being killed, so use it for storage only.
         """
-        if 'offerNumberUnique' in self.storage_data.keys():
-            self.storage_data['offerNumberUnique'].append(len(self.agent_brain.offers_unique))
-        else:
-            self.storage_data['offerNumberUnique'] = [len(self.agent_brain.offers_unique)]
-        if 'domainName' in self.storage_data.keys():
-            self.storage_data['domainName'].append(self.domain.getName())
-        else:
-            self.storage_data['domainName'] = [self.domain.getName()]
-        with open(f"{self.storage_dir}/{self.opponent_id}data.md", "w") as f:
-            f.write(json.dumps(self.storage_data))
+        try:
+            if 'offerNumberUnique' in self.storage_data.keys():
+                self.storage_data['offerNumberUnique'].append(len(self.agent_brain.offers_unique))
+            else:
+                self.storage_data['offerNumberUnique'] = [len(self.agent_brain.offers_unique)]
+            if 'acceptance_condition' in self.storage_data.keys():
+                self.storage_data['acceptance_condition'].append(self.agent_brain.acceptance_condition)
+            else:
+                self.storage_data['acceptance_condition'] = [self.agent_brain.acceptance_condition]
+            if 'model_feature_importance' in self.storage_data.keys():
+                self.storage_data['model_feature_importance'].append(self.agent_brain.model_feature_importance())
+            else:
+                self.storage_data['model_feature_importance'] = [self.agent_brain.model_feature_importance()]
+
+            with open(f"{self.storage_dir}/{self.opponent_id}data.md", "w") as f:
+                f.write(json.dumps(self.storage_data))
+
+        except Exception:
+            pass
 
     def load_data(self):
         if self.opponent_id is not None and self.storage_dir is not None:

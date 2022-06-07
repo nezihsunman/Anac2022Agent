@@ -10,6 +10,7 @@ from geniusweb.issuevalue.Bid import Bid
 class AgentBrain:
     def __init__(self):
 
+        self.acceptance_condition = 0
         self.my_offered_number_of_time_from_ai = 0
         self.sorted_bids_agent_that_greater_than_065_df = pd.DataFrame()
         self.sorted_bids_agent_that_greater_than_065 = []
@@ -148,7 +149,7 @@ class AgentBrain:
 
         for index, i in enumerate(self.sorted_bids_agent_that_greater_than_065):
             util = float(self.profile.getUtility(i))
-            if float(self.reservationBid_utility) < util \
+            if float(self.reservationBid_utility) <= util \
                     and (((float(0.93) - (
                     (float(0.95) - (self.goal_of_utility - float(0.18))) * float(progress_time))) < util)
                          and float(0.40) < util_of_opponent[index] < util - float(0.10)):
@@ -213,11 +214,12 @@ class AgentBrain:
         return df
 
     def model_feature_importance(self):
-        df = pd.DataFrame({'Value': self.lgb_model.feature_importance(), 'Feature': self.X.columns})
-        df = pd.DataFrame({'Value': self.lgb_model.feature_importance(), 'Feature': self.X.columns})
-        result = df.to_json(orient="split")
-        parsed = json.loads(result)
-        return parsed
+        if self.lgb_model is not None:
+            df = pd.DataFrame({'Value': self.lgb_model.feature_importance(), 'Feature': self.X.columns})
+            result = df.to_json(orient="split")
+            parsed = json.loads(result)
+            return parsed
+        return ""
 
     def util_add_agent_first_n_bid_to_machine_learning_with_low_utility(self, bid, ratio):
         bid_value_array = self.get_bid_value_array_for_data_frame_usage(bid)
@@ -249,56 +251,45 @@ class AgentBrain:
             bid_number = 4
         for i in range(0, bid_number + 1):
             bid = sorted_bids_agent[i]
-            self.util_add_agent_first_n_bid_to_machine_learning_with_low_utility(bid,
-                                                                                 float(float(i) / float(bid_number)))
+            self.util_add_agent_first_n_bid_to_machine_learning_with_low_utility(bid, float(float(i) / float(bid_number)))
 
     def is_acceptable(self, bid: Bid, progress):
         util = float(self.profile.getUtility(bid))
-        if util >= 0.94:
-            print("I accept")
-            return True
-        elif util >= 0.91 and 0.76 > float(self.call_model_lgb(bid)) > 0.6:
-            print("I accept" + "util >= 0.91")
-            return True
-        elif float(0.85) >= float(progress) > 0.82 and util > self.goal_of_utility - float(0.1) and util - float(
-                0.28) > float(
-            self.call_model_lgb(bid)):
-            print("I accept" + "elif 0.94 > float(progress) > 0.82 and util > self.goal_of_utility")
-            return True
-        elif float(0.94) >= float(progress) > 0.85 and util > self.goal_of_utility - float(0.14) and util - float(
-                0.23) > float(
-            self.call_model_lgb(bid)):
-            print("I accept" + "elif 0.94 > float(progress) > 0.85 and util > self.goal_of_utility")
-
-            return True
-        elif float(1.0) >= float(progress) > 0.93 and util > self.goal_of_utility - float(0.2) and util - float(
-                0.18) > float(
-            self.call_model_lgb(bid)):
-            print("I accept" + "elif 0.97 > float(progress) > 0.93")
-            return True
-        elif float(1.0) >= float(progress) > 0.97 and util - float(0.12) > float(self.call_model_lgb(bid)):
-            print("I accept" + "1 >= float(progress) > 0.98")
-            return True
+        if util >= float(self.reservationBid_utility):
+            if util >= 0.94:
+                self.acceptance_condition = 1
+                return True
+            elif util >= 0.91 and 0.76 > float(self.call_model_lgb(bid)) > 0.6:
+                self.acceptance_condition = 2
+                return True
+            elif float(0.85) >= float(progress) > 0.82 and util > self.goal_of_utility - float(0.1) and util - float(0.28) > float(self.call_model_lgb(bid)):
+                self.acceptance_condition = 3
+                return True
+            elif float(0.94) >= float(progress) > 0.85 and util > self.goal_of_utility - float(0.14) and util - float(0.23) > float(self.call_model_lgb(bid)):
+                self.acceptance_condition = 4
+                return True
+            elif float(1.0) >= float(progress) > 0.93 and util > self.goal_of_utility - float(0.2) and util - float(0.18) > float(self.call_model_lgb(bid)):
+                self.acceptance_condition = 5
+                return True
+            elif float(1.0) >= float(progress) > 0.97 and util - float(0.12) > float(self.call_model_lgb(bid)):
+                self.acceptance_condition = 6
+                return True
         return False
 
     def find_bid(self, progress_time):
         progress_time = float(progress_time)
-        if float(self.my_offered_number_of_time_from_ai) < float(len(
-                self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent)) * float(
-            2) and 0 < progress_time < 0.95 and self.lgb_model is not None \
+        if float(self.my_offered_number_of_time_from_ai) < float(len(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent)) * float(2) \
+                and 0 < progress_time < 0.95 and self.lgb_model is not None \
                 and len(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent) >= 1:
             index = random.randint(0,
                                    len(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent) - 1)
-            if float(self.reservationBid_utility) < float(
-                    self.profile.getUtility(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent[index])):
+            if float(self.reservationBid_utility) < float(self.profile.getUtility(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent[index])):
                 self.my_offered_number_of_time_from_ai = self.my_offered_number_of_time_from_ai + 1
                 return self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent[index]
-        elif ((0.25 < progress_time < 0.30) or (0.58 < progress_time < 0.64) or (
-                0.82 < progress_time < 0.86) or (
-                      0.965 < progress_time <= 0.99)) and self.lgb_model is not None and len(
+        elif ((0.25 < progress_time < 0.30) or (0.58 < progress_time < 0.64) or (0.82 < progress_time < 0.86) or (
+                0.965 < progress_time <= 0.995)) and self.lgb_model is not None and len(
             self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent) >= 1:
-            index = random.randint(0,
-                                   len(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent) - 1)
+            index = random.randint(0, len(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent) - 1)
             if float(self.reservationBid_utility) < float(
                     self.profile.getUtility(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent[index])):
                 return self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent[index]
@@ -347,11 +338,13 @@ class AgentBrain:
                 index = random.randint(1, self.number_of_goal_of_utility)
                 if float(self.reservationBid_utility) < float(self.profile.getUtility(self.sorted_bids_agent[index])):
                     return self.sorted_bids_agent[index]
-        elif 0.91 <= progress_time <= 0.999:
+        elif 0.91 <= progress_time <= 0.995:
             if self.offers_unique_sorted is not None and not len(self.offers_unique_sorted) == 0:
                 bid = self.offers_unique_sorted[0]
                 util_of_bid = float(self.profile.getUtility(bid))
-                if float(self.reservationBid_utility) < float(util_of_bid) and float(util_of_bid) >= float(
-                        self.goal_of_utility) - float(0.03) and float(self.call_model_lgb(bid)) < util_of_bid:
+                if float(self.reservationBid_utility) < float(util_of_bid) and float(util_of_bid) >= float(self.goal_of_utility) - float(0.03) and float(
+                        self.call_model_lgb(bid)) < util_of_bid:
                     return bid
-        return self.sorted_bids_agent[3]
+        elif float(self.reservationBid_utility) < float(self.profile.getUtility(self.sorted_bids_agent[3])):
+            return self.sorted_bids_agent[3]
+        return self.sorted_bids_agent[0]
