@@ -27,10 +27,10 @@ from geniusweb.progress.ProgressTime import ProgressTime
 from geniusweb.references.Parameters import Parameters
 from tudelft_utilities_logging.ReportToLogger import ReportToLogger
 
-from agents.SUN_AGENT.utils.Sun_Agent_Brain import AgentBrain
+from agents.Pinar_Agent.utils.Pinar_Agent_Brain import Pinar_Agent_Brain
 
 
-class SunAgent(DefaultParty):
+class Pinar_Agent(DefaultParty):
     def __init__(self):
         super().__init__()
         self.logger: ReportToLogger = self.getReporter()
@@ -48,7 +48,7 @@ class SunAgent(DefaultParty):
 
         self.last_received_bid: Bid = None
 
-        self.agent_brain = AgentBrain()
+        self.agent_brain = Pinar_Agent_Brain()
 
         self.storage_data = {}
         self.isFirstRound = True
@@ -150,7 +150,7 @@ class SunAgent(DefaultParty):
         Returns:
             str: Agent description
         """
-        return "SunAgent that empowered by LightGBM tries to find opponent weak side"
+        return "Precious Intelligent Negotiation Agreement Robot(Pinar) that empowered by LightGBM tries to find opponent weak side"
 
     def opponent_action(self, action):
         """Process an action that was received from the opponent.

@@ -27,8 +27,8 @@ def main():
         settings = {
             "agents": [
                 {
-                    "class": "agents.SUN_AGENT.SUN_Agent.SunAgent",
-                    "parameters": {"storage_dir": "agent_storage/SunAgent"},
+                    "class": "agents.Pinar_Agent.Pinar_Agent.Pinar_Agent",
+                    "parameters": {"storage_dir": "agent_storage/Pinar_Agent"},
                 },
                 {
                     "class": "agents.CSE3210.agent26.agent26.Agent26",

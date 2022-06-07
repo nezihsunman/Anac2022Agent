@@ -18,7 +18,7 @@ if not RESULTS_DIR.exists():
 tournament_settings = {
     "agents": [
         {
-            "class": "agents.SUN_AGENT.SUN_Agent.SunAgent",
+            "class": "agents.Pinar_Agent.SUN_Agent.SunAgent",
             "parameters": {"storage_dir": "agent_storage/SunAgent"},
         },
         {

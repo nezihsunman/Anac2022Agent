@@ -7,7 +7,7 @@ from geniusweb.bidspace.AllBidsList import AllBidsList
 from geniusweb.issuevalue.Bid import Bid
 
 
-class AgentBrain:
+class Pinar_Agent_Brain:
     def __init__(self):
 
         self.acceptance_condition = 0
