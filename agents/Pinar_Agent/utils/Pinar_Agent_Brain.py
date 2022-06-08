@@ -279,7 +279,8 @@ class Pinar_Agent_Brain:
     def find_bid(self, progress_time):
         progress_time = float(progress_time)
         if float(self.my_offered_number_of_time_from_ai) < float(len(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent)) * float(2) \
-                and 0 < progress_time < 0.95 and self.lgb_model is not None \
+                and ((0 < progress_time < 0.17) or (0.23 < progress_time < 0.37) or (0.45 < progress_time < 0.93) or (
+                0.97 < progress_time <= 0.985)) and self.lgb_model is not None \
                 and len(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent) >= 1:
             index = random.randint(0,
                                    len(self.eva_util_val_acc_to_lgb_m_with_max_bids_for_agent) - 1)
