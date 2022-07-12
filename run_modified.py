@@ -21,19 +21,18 @@ def main():
     domain = "domains/domain"
     profileJsonOfOpponent = "/profileA.json"
     profileJsonOfAgent = "/profileB.json"
-    for i in range(12, 16):
+    for i in [3, 4, 5, 7]:
         stringNumber = str(i).zfill(2)
         print(stringNumber)
         settings = {
             "agents": [
                 {
-                    "class": "agents.boulware_agent.boulware_agent.BoulwareAgent",
+                    "class": "agents.Pinar_Agent.Pinar_Agent.Pinar_Agent",
+                    "parameters": {"storage_dir": "agent_storage/Pinar_Agent"},
                 },
                 {
-                    "class": "agents.SUN_AGENT.SUN_Agent.SunAgent",
-                    "parameters": {"storage_dir": "agent_storage/SunAgent",
-                                   "profiles_domain_of_opponent": domain + stringNumber + profileJsonOfOpponent},
-                },
+                    "class": "agents.CSE3210.agent26.agent26.Agent26",
+                }
             ],
             "profiles": [domain + stringNumber + profileJsonOfOpponent, domain + stringNumber + profileJsonOfAgent],
             "deadline_time_ms": 60000,
@@ -43,13 +42,40 @@ def main():
         session_results_trace, session_results_summary = run_session(settings)
         # plot trace to html file
         if not session_results_trace["error"]:
-            plot_trace(session_results_trace, RESULTS_DIR.joinpath("trace_plot.html"))
+            plot_trace(session_results_trace, RESULTS_DIR.joinpath("trace_plot" + str(stringNumber) + ".html"))
 
         # write results to file
-        with open(RESULTS_DIR.joinpath("session_results_trace.json"), "w", encoding="utf-8") as f:
+        with open(RESULTS_DIR.joinpath("session_results_trace+" + str(stringNumber) + ".json"), "w",
+                  encoding="utf-8") as f:
             f.write(json.dumps(session_results_trace, indent=2))
-        with open(RESULTS_DIR.joinpath("session_results_summary.json"), "w", encoding="utf-8") as f:
+        with open(RESULTS_DIR.joinpath("session_results_summary" + str(stringNumber) + ".json"), "w",
+                  encoding="utf-8") as f:
             f.write(json.dumps(session_results_summary, indent=2))
+
+
+def analysis():
+    with open("results" + "/20220607-013859" + "/tournament_results.json") as file:
+        temp = json.load(file)
+    with open("results" + "/20220607-013859" + "/tournament_steps.json") as file:
+        temp2 = json.load(file)
+    t = 0
+    for i in range(0, len(temp)):
+        a = temp[i]
+        b = temp2[i]
+        strr = 'agent_' + str(t + 1)
+        str2 = 'agent_' + str(t + 2)
+        if a[strr] == 'SunAgent':
+            if a['result'] == 'failed':
+                print(b['profiles'])
+            elif a['result'] == 'ERROR':
+                print("error " + str(b['profiles']))
+        elif a[str2] == 'SunAgent':
+            if a['result'] == 'failed':
+                print(b['profiles'])
+            elif a['result'] == 'ERROR':
+                print("error " + str(b['profiles']))
+
+        t = t + 2
 
 
 if __name__ == "__main__":
